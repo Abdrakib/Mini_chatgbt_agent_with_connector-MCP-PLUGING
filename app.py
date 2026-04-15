@@ -77,6 +77,19 @@ def _tool_used_line(tool_key: str) -> str:
     return _TOOL_USED_LABEL.get(k, k.title() if k else "No tool")
 
 
+def _render_assistant_footer(tool_key: str) -> None:
+    st.markdown(
+        f'<p style="color:#888;font-size:0.85em;margin-top:0.5rem;">'
+        f"Tool: {_tool_used_line(tool_key)}</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<p style="color:#888;font-size:0.85em;">'
+        f"Tools on: {_active_tools_label()}</p>",
+        unsafe_allow_html=True,
+    )
+
+
 with st.sidebar:
     st.header("🛠 Tools")
     st.checkbox("🔍 Web Search", key="tool_search")
@@ -99,20 +112,11 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message["role"] == "assistant":
-            tool_key = message.get("tool_used", "none")
-            st.markdown(
-                f'<p style="color:#888;font-size:0.85em;margin-top:0.5rem;">'
-                f"Tool: {_tool_used_line(tool_key)}</p>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<p style="color:#888;font-size:0.85em;">'
-                f"Tools on: {_active_tools_label()}</p>",
-                unsafe_allow_html=True,
-            )
+            _render_assistant_footer(message.get("tool_used", "none"))
 
 if prompt := st.chat_input("Message"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
     active_tools = {
         "search": st.session_state["tool_search"],
@@ -158,6 +162,11 @@ if prompt := st.chat_input("Message"):
     body_parts.append(reply)
     content = "\n\n".join(body_parts)
 
+    with st.chat_message("assistant"):
+        st.markdown(content)
+        _render_assistant_footer(tool_name)
+
+    st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.messages.append(
         {
             "role": "assistant",
@@ -165,4 +174,3 @@ if prompt := st.chat_input("Message"):
             "tool_used": tool_name,
         }
     )
-    st.rerun()
