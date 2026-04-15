@@ -1,0 +1,66 @@
+_SYSTEM_INSTRUCTIONS = """You are Mini ChatGPT Agent, a helpful AI assistant. Be concise and clear. If a tool result is provided below, use that information to answer the user. If memory context is provided, personalize your response using it. Never make up information you do not have."""
+
+_TOOL_LABEL = "Tool Result:"
+_MEMORY_LABEL = "What I know about you:"
+
+_TOOL_DISPLAY = {
+    "weather": "Weather",
+    "search": "Search",
+    "calc": "Calculator",
+    "memory": "Memory",
+    "github": "GitHub",
+}
+
+
+def build_prompt(message: str, tool_result: str, memory_context: str) -> str:
+    parts: list[str] = [_SYSTEM_INSTRUCTIONS, ""]
+    tr = (tool_result or "").strip()
+    mc = (memory_context or "").strip()
+    if tr:
+        parts.extend([_TOOL_LABEL, tr, ""])
+    if mc:
+        parts.extend([_MEMORY_LABEL, mc, ""])
+    parts.append((message or "").strip())
+    return "\n".join(parts).strip()
+
+
+def build_auto_enable_notice(tool_name: str) -> str:
+    key = (tool_name or "").strip().lower()
+    label = _TOOL_DISPLAY.get(key, tool_name.strip().title() if tool_name else "tool")
+    return (
+        f"I noticed your {label} tool was off. I turned it on to help you better 🔧"
+    )
+
+
+if __name__ == "__main__":
+    import sys
+
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except (OSError, ValueError):
+            pass
+
+    print("--- build_prompt: tool + memory ---")
+    print(
+        build_prompt(
+            "What should I pack?",
+            "Philadelphia: Sunny, 72F",
+            "name is Rakib; city is Philadelphia",
+        )
+    )
+    print()
+    print("--- build_prompt: tool only ---")
+    print(
+        build_prompt(
+            "Summarize this.",
+            "Search result line 1\nSearch result line 2",
+            "",
+        )
+    )
+    print()
+    print("--- build_prompt: no tool, no memory ---")
+    print(build_prompt("Hello there!", "", ""))
+    print()
+    print("--- build_auto_enable_notice ---")
+    print(build_auto_enable_notice("weather"))
