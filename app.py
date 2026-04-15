@@ -165,3 +165,4 @@ if prompt := st.chat_input("Message"):
             "tool_used": tool_name,
         }
     )
+    st.rerun()
