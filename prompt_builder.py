@@ -1,6 +1,3 @@
-_TOOL_LABEL = "Tool Result:"
-_MEMORY_LABEL = "What I know about you:"
-
 _TOOL_DISPLAY = {
     "weather": "Weather",
     "search": "Search",
@@ -11,15 +8,17 @@ _TOOL_DISPLAY = {
 
 
 def build_prompt(message: str, tool_result: str, memory_context: str) -> str:
-    parts: list[str] = []
-    tr = (tool_result or "").strip()
-    mc = (memory_context or "").strip()
-    if tr:
-        parts.extend([_TOOL_LABEL, tr, ""])
-    if mc:
-        parts.extend([_MEMORY_LABEL, mc, ""])
-    parts.append((message or "").strip())
-    return "\n".join(parts).strip()
+    parts = []
+    if memory_context:
+        parts.append(f"Facts about the user: {memory_context}")
+    if tool_result:
+        parts.append(f"Use this information to answer: {tool_result}")
+        parts.append(f"Question: {message}")
+        parts.append("Give a short direct answer using only the information above.")
+    else:
+        parts.append(f"Question: {message}")
+        parts.append("Give a short direct answer in 1-2 sentences.")
+    return "\n".join(parts)
 
 
 def build_auto_enable_notice(tool_name: str) -> str:
