@@ -79,51 +79,22 @@ if "auto_enabled_tool" in st.session_state:
             st.session_state[_session_key] = True
 
 
-def _layout_css(sidebar_open: bool) -> str:
-    hide_sb = ""
+def _main_css(sidebar_open: bool) -> str:
+    hide = ""
     if not sidebar_open:
-        hide_sb = """
-        section[data-testid="stSidebar"] { display: none !important; }
-        """
+        hide = "section[data-testid=\"stSidebar\"] { display: none !important; }\n"
     return f"""
 <style>
-{hide_sb}
-[data-testid="collapsedControl"] {{ display: none !important; }}
-section.main .block-container {{
-    padding-top: 48px !important;
-    padding-bottom: 200px !important;
-}}
-section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type {{
-    position: fixed !important;
-    top: 10px !important;
-    left: 10px !important;
-    z-index: 9999 !important;
-    width: auto !important;
-    min-height: unset !important;
-}}
-section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"] {{
-    flex: 0 0 auto !important;
-    width: auto !important;
-}}
-.bottom-bar {{
+{hide}
+div[data-testid="stVerticalBlock"] > div:first-child button {{
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    padding: 10px 20px;
-    z-index: 999;
-    box-sizing: border-box;
-}}
-div[data-testid="stVerticalBlock"]:has([data-testid="stChatInput"]) {{
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    background: white !important;
-    padding: 10px 20px !important;
-    z-index: 999 !important;
-    box-sizing: border-box !important;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 99999;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    font-size: 1rem;
 }}
 </style>
 """
@@ -201,15 +172,12 @@ def _render_assistant_footer(tool_key: str) -> None:
     )
 
 
-st.markdown(_layout_css(st.session_state.get("sidebar_open", True)), unsafe_allow_html=True)
+st.markdown(_main_css(st.session_state.get("sidebar_open", True)), unsafe_allow_html=True)
 
-_h_cols = st.columns([1, 32])
-with _h_cols[0]:
-    if st.button("☰", key="hamburger_sidebar_toggle", help="Toggle sidebar"):
-        st.session_state.sidebar_open = not st.session_state.get("sidebar_open", True)
-        st.rerun()
+if st.button("☰", key="toggle_sidebar", type="secondary"):
+    st.session_state.sidebar_open = not st.session_state.get("sidebar_open", True)
+    st.rerun()
 
-# Sidebar: small app name, New chat, history (no hamburger in sidebar)
 st.sidebar.markdown("##### Mini ChatGPT Agent")
 if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
     _archive_current_if_nonempty()
@@ -247,34 +215,34 @@ for state_key, emoji, name, bg, fg in _BADGES:
             f'margin:0 6px 6px 0;white-space:nowrap">{emoji} {name}</span>'
         )
 
-with st.container():
-    if _badge_parts:
-        st.markdown(
-            '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
-            + "".join(_badge_parts)
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-    _bottom_cols = st.columns([0.08, 0.92])
-    with _bottom_cols[0]:
-        with st.popover("➕", use_container_width=True):
-            st.markdown("**Tools**")
-            st.checkbox("🔍 Web Search", key="tool_search")
-            st.checkbox("🌤 Weather", key="tool_weather")
-            st.checkbox("🧮 Calculator", key="tool_calc")
-            st.checkbox("🧠 Memory", key="tool_memory")
-            st.checkbox("🔬 Deep Search", key="tool_deep_search")
-            st.checkbox("🐙 GitHub", key="tool_github")
-            if st.session_state.get("tool_github"):
-                st.text_input(
-                    "GitHub token",
-                    type="password",
-                    help="Personal access token for GitHub API",
-                    key="github_token",
-                )
+if _badge_parts:
+    st.markdown(
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+        + "".join(_badge_parts)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
 
-    with _bottom_cols[1]:
-        _chat_raw = st.chat_input("Message")
+_bottom_cols = st.columns([0.08, 0.92])
+with _bottom_cols[0]:
+    with st.popover("➕", use_container_width=True):
+        st.markdown("**Tools**")
+        st.checkbox("🔍 Web Search", key="tool_search")
+        st.checkbox("🌤 Weather", key="tool_weather")
+        st.checkbox("🧮 Calculator", key="tool_calc")
+        st.checkbox("🧠 Memory", key="tool_memory")
+        st.checkbox("🔬 Deep Search", key="tool_deep_search")
+        st.checkbox("🐙 GitHub", key="tool_github")
+        if st.session_state.get("tool_github"):
+            st.text_input(
+                "GitHub token",
+                type="password",
+                help="Personal access token for GitHub API",
+                key="github_token",
+            )
+
+with _bottom_cols[1]:
+    _chat_raw = st.chat_input("Message")
 
 prompt = (_chat_raw or "").strip()
 if prompt:
