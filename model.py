@@ -4,12 +4,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 _MODEL = None
 _TOKENIZER = None
 
-_MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+_MODEL_ID = "microsoft/phi-2"
 
-_SYSTEM_MESSAGE = (
-    "You are a helpful assistant. Always reply in English. "
-    "Keep replies short and direct. Never reply in French, Italian, Spanish or any other language."
-)
+# Must match tool label in prompt_builder when a tool returned data
+_TOOL_RESULT_MARKER = "Tool Result:"
 
 
 def _load_model() -> None:
@@ -27,21 +25,22 @@ def _load_model() -> None:
         device_map="auto",
     )
     _MODEL.eval()
-    print("TinyLlama loaded successfully")
+    print("Model loaded successfully")
 
 
 def generate_response(prompt: str) -> str:
     _load_model()
 
-    messages = [
-        {"role": "system", "content": _SYSTEM_MESSAGE},
-        {"role": "user", "content": prompt},
-    ]
-    input_text = _TOKENIZER.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
+    system = (
+        "You are a helpful assistant. Always reply in English only. "
+        "Keep replies short and direct."
     )
+
+    if _TOOL_RESULT_MARKER in prompt:
+        input_text = f"{system}\n\n{prompt}\nAnswer:"
+    else:
+        input_text = f"{system}\n\nUser: {prompt}\nAssistant:"
+
     inputs = _TOKENIZER(input_text, return_tensors="pt")
     device = next(_MODEL.parameters()).device
     inputs = {k: v.to(device) for k, v in inputs.items()}
