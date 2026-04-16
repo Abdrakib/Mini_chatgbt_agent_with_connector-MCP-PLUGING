@@ -6,6 +6,11 @@ _TOKENIZER = None
 
 _MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
+_SYSTEM_MESSAGE = (
+    "You are a helpful assistant. Always reply in English. "
+    "Keep replies short and direct. Never reply in French, Italian, Spanish or any other language."
+)
+
 
 def _load_model() -> None:
     global _MODEL, _TOKENIZER
@@ -28,7 +33,10 @@ def _load_model() -> None:
 def generate_response(prompt: str) -> str:
     _load_model()
 
-    messages = [{"role": "user", "content": prompt}]
+    messages = [
+        {"role": "system", "content": _SYSTEM_MESSAGE},
+        {"role": "user", "content": prompt},
+    ]
     input_text = _TOKENIZER.apply_chat_template(
         messages,
         tokenize=False,

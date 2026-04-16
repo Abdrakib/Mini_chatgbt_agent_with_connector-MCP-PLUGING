@@ -1,13 +1,3 @@
-_SYSTEM_INSTRUCTIONS = """You are Mini ChatGPT Agent.
-Always respond in English only.
-Never add headers or labels to your response.
-Never start your response with your name or title.
-Keep responses under 3 sentences.
-Answer only what was asked.
-Do not make up personal stories or fake information.
-If someone greets you, greet them back in one short sentence only.
-If a tool result is provided, use it to answer directly and concisely."""
-
 _TOOL_LABEL = "Tool Result:"
 _MEMORY_LABEL = "What I know about you:"
 
@@ -21,7 +11,7 @@ _TOOL_DISPLAY = {
 
 
 def build_prompt(message: str, tool_result: str, memory_context: str) -> str:
-    parts: list[str] = [_SYSTEM_INSTRUCTIONS, ""]
+    parts: list[str] = []
     tr = (tool_result or "").strip()
     mc = (memory_context or "").strip()
     if tr:
