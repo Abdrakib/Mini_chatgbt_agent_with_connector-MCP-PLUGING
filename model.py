@@ -4,10 +4,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 _MODEL = None
 _TOKENIZER = None
 
-_MODEL_ID = "microsoft/phi-2"
+_MODEL_ID = "microsoft/Phi-3-mini-4k-instruct"
 
-# Must match tool label in prompt_builder when a tool returned data
-_TOOL_RESULT_MARKER = "Tool Result:"
+_SYSTEM_MESSAGE = (
+    "You are a helpful assistant. Always reply in English only. "
+    "Keep replies short and under 3 sentences. Never reply in French, Spanish, Italian or any other language."
+)
 
 
 def _load_model() -> None:
@@ -15,7 +17,7 @@ def _load_model() -> None:
     if _MODEL is not None:
         return
 
-    _TOKENIZER = AutoTokenizer.from_pretrained(_MODEL_ID)
+    _TOKENIZER = AutoTokenizer.from_pretrained(_MODEL_ID, trust_remote_code=True)
     if _TOKENIZER.pad_token is None:
         _TOKENIZER.pad_token = _TOKENIZER.eos_token
 
@@ -23,6 +25,7 @@ def _load_model() -> None:
         _MODEL_ID,
         torch_dtype=torch.float16,
         device_map="auto",
+        trust_remote_code=True,
     )
     _MODEL.eval()
     print("Model loaded successfully")
@@ -31,16 +34,21 @@ def _load_model() -> None:
 def generate_response(prompt: str) -> str:
     _load_model()
 
-    system = (
-        "You are a helpful assistant. Always reply in English only. "
-        "Keep replies short and direct."
+    messages = [
+        {
+            "role": "system",
+            "content": _SYSTEM_MESSAGE,
+        },
+        {
+            "role": "user",
+            "content": prompt,
+        },
+    ]
+    input_text = _TOKENIZER.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
     )
-
-    if _TOOL_RESULT_MARKER in prompt:
-        input_text = f"{system}\n\n{prompt}\nAnswer:"
-    else:
-        input_text = f"{system}\n\nUser: {prompt}\nAssistant:"
-
     inputs = _TOKENIZER(input_text, return_tensors="pt")
     device = next(_MODEL.parameters()).device
     inputs = {k: v.to(device) for k, v in inputs.items()}
