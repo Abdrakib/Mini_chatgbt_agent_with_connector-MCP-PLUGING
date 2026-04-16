@@ -18,6 +18,17 @@ _WEATHER_KEYS = (
     "wind",
 )
 
+_DEEP_SEARCH_KEYS = (
+    "deep search",
+    "research",
+    "explain in detail",
+    "comprehensive",
+    "everything about",
+    "full explanation",
+    "in depth",
+    "deep dive",
+)
+
 _SEARCH_KEYS = (
     "search",
     "look up",
@@ -81,8 +92,9 @@ def _is_calc(message: str) -> bool:
 
 def _detect_tool(message: str) -> str:
     """
-    First-match routing. Order: memory → github → weather → calc → search.
+    First-match routing. Order: memory → github → weather → calc → deep_search → search.
     Calc is checked before search so expressions like 'what is 5 + 3' prefer calc.
+    Deep search is checked before generic search so 'deep search' does not match only 'search'.
     """
     if _contains_any(message, _MEMORY_KEYS):
         return "memory"
@@ -92,6 +104,8 @@ def _detect_tool(message: str) -> str:
         return "weather"
     if _is_calc(message):
         return "calc"
+    if _contains_any(message, _DEEP_SEARCH_KEYS):
+        return "deep_search"
     if _contains_any(message, _SEARCH_KEYS):
         return "search"
     return "none"
@@ -112,6 +126,7 @@ def route(message: str, active_tools: Dict[str, Any]) -> Dict[str, Any]:
 if __name__ == "__main__":
     _all_on = {
         "search": True,
+        "deep_search": True,
         "weather": True,
         "calc": True,
         "memory": True,
@@ -125,6 +140,9 @@ if __name__ == "__main__":
         "search for AI news",
         "show my github repos",
         "hello how are you",
+        "research quantum computing",
+        "deep dive into neural networks",
+        "explain in detail how transformers work",
     )
     for m in _msgs:
         tools = dict(_all_on)

@@ -7,6 +7,7 @@ from model import generate_response
 from prompt_builder import build_auto_enable_notice, build_prompt
 from router import route
 from tools.calculator import run_calculator
+from tools.deep_search import run_deep_search
 from tools.github import run_github
 from tools.memory import get_memory_context, run_memory
 from tools.search import run_search
@@ -22,11 +23,13 @@ _TOOL_DEFAULTS = {
     "tool_weather": True,
     "tool_calc": True,
     "tool_memory": True,
+    "tool_deep_search": True,
     "tool_github": False,
 }
 
 _ROUTER_TO_SESSION = {
     "search": "tool_search",
+    "deep_search": "tool_deep_search",
     "weather": "tool_weather",
     "calc": "tool_calc",
     "memory": "tool_memory",
@@ -36,18 +39,20 @@ _ROUTER_TO_SESSION = {
 _TOOL_USED_LABEL = {
     "weather": "Weather",
     "search": "Web Search",
+    "deep_search": "Deep Search",
     "calc": "Calculator",
     "memory": "Memory",
     "github": "GitHub",
     "none": "No tool",
 }
 
-_TOOL_CHIPS = (
-    ("tool_search", "🔍", "Web Search"),
-    ("tool_weather", "🌤", "Weather"),
-    ("tool_calc", "🧮", "Calculator"),
-    ("tool_memory", "🧠", "Memory"),
-    ("tool_github", "🐙", "GitHub"),
+_BADGES = (
+    ("tool_search", "🔍", "Web Search", "#E3F2FD", "#1565C0"),
+    ("tool_weather", "🌤", "Weather", "#FFF3E0", "#E65100"),
+    ("tool_calc", "🧮", "Calculator", "#E8F5E9", "#2E7D32"),
+    ("tool_memory", "🧠", "Memory", "#F3E5F5", "#6A1B9A"),
+    ("tool_deep_search", "🔬", "Deep Search", "#E0F7FA", "#006064"),
+    ("tool_github", "🐙", "GitHub", "#EDE7F6", "#4527A0"),
 )
 
 if "messages" not in st.session_state:
@@ -58,6 +63,9 @@ if "archived_chats" not in st.session_state:
 
 if "github_token" not in st.session_state:
     st.session_state.github_token = ""
+
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = True
 
 for key, default in _TOOL_DEFAULTS.items():
     if key not in st.session_state:
@@ -72,7 +80,6 @@ if "auto_enabled_tool" in st.session_state:
 
 
 def _messages_signature(messages: list) -> str:
-    """Stable compare for deciding whether to archive before switching chats."""
     try:
         return json.dumps(
             [
@@ -119,6 +126,8 @@ def _active_tools_label() -> str:
         labels.append("Calculator")
     if st.session_state.get("tool_memory", True):
         labels.append("Memory")
+    if st.session_state.get("tool_deep_search", True):
+        labels.append("Deep Search")
     if st.session_state.get("tool_github", False):
         labels.append("GitHub")
     return ", ".join(labels) if labels else "None"
@@ -142,69 +151,124 @@ def _render_assistant_footer(tool_key: str) -> None:
     )
 
 
-# --- Sidebar: app name, new chat, history ---
-with st.sidebar:
-    st.markdown("### 🤖 Mini ChatGPT Agent")
-    if st.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
-        _archive_current_if_nonempty()
-        st.session_state.messages = []
+def _toolbar_css(sidebar_open: bool) -> str:
+    hide_sidebar = ""
+    if not sidebar_open:
+        hide_sidebar = """
+        [data-testid="stSidebar"] { display: none !important; }
+        [data-testid="stSidebarNavLink"] { display: none !important; }
+        """
+    return f"""
+<style>
+{hide_sidebar}
+[data-testid="collapsedControl"] {{ display: none !important; }}
+button[aria-label="Close sidebar"] {{ display: none !important; }}
+section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type {{
+    position: fixed !important;
+    top: 0.65rem !important;
+    left: 0.75rem !important;
+    z-index: 1000002 !important;
+    width: auto !important;
+    min-height: unset !important;
+}}
+section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"] {{
+    width: auto !important;
+    flex: 0 0 auto !important;
+}}
+section.main .block-container {{
+    padding-top: 2.85rem !important;
+}}
+</style>
+"""
+
+
+# Fixed hamburger + hide default sidebar control; hide sidebar panel when collapsed
+st.markdown(_toolbar_css(st.session_state.get("sidebar_open", True)), unsafe_allow_html=True)
+
+_hb_cols = st.columns([1, 32])
+with _hb_cols[0]:
+    if st.button("☰", key="hamburger_menu", help="Toggle sidebar"):
+        st.session_state.sidebar_open = not st.session_state.get("sidebar_open", True)
         st.rerun()
 
-    st.markdown("**Chats**")
-    for conv in list(st.session_state.archived_chats):
-        cid = conv["id"]
-        title = conv.get("title") or "Untitled"
-        if st.button(
-            title,
-            key=f"sidebar_chat_{cid}",
-            use_container_width=True,
-        ):
-            cur = st.session_state.get("messages") or []
-            target_sig = _messages_signature(conv.get("messages") or [])
-            if cur and _messages_signature(cur) != target_sig:
-                _archive_current_if_nonempty()
-            st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
+# Sidebar: app name + chat history only (when open)
+if st.session_state.get("sidebar_open", True):
+    with st.sidebar:
+        st.markdown("### 🤖 Mini ChatGPT Agent")
+        if st.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
+            _archive_current_if_nonempty()
+            st.session_state.messages = []
             st.rerun()
 
-# --- Main chat ---
+        st.markdown("**Chats**")
+        for conv in list(st.session_state.archived_chats):
+            cid = conv["id"]
+            title = conv.get("title") or "Untitled"
+            if st.button(
+                title,
+                key=f"sidebar_chat_{cid}",
+                use_container_width=True,
+            ):
+                cur = st.session_state.get("messages") or []
+                target_sig = _messages_signature(conv.get("messages") or [])
+                if cur and _messages_signature(cur) != target_sig:
+                    _archive_current_if_nonempty()
+                st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
+                st.rerun()
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message["role"] == "assistant":
             _render_assistant_footer(message.get("tool_used", "none"))
 
-# --- Tool chips (above chat input) ---
-_chip_cols = st.columns(len(_TOOL_CHIPS), gap="small")
-for i, (state_key, emoji, name) in enumerate(_TOOL_CHIPS):
-    with _chip_cols[i]:
-        is_on = st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False))
-        if st.button(
-            f"{emoji} {name}",
-            key=f"chip_toggle_{state_key}",
-            use_container_width=True,
-            type="primary" if is_on else "secondary",
-        ):
-            st.session_state[state_key] = not is_on
-            st.rerun()
-
-if st.session_state.get("tool_github"):
-    _tok_row = st.columns(len(_TOOL_CHIPS), gap="small")
-    for _j in range(len(_TOOL_CHIPS) - 1):
-        _tok_row[_j].empty()
-    with _tok_row[-1]:
-        st.text_input(
-            "GitHub token",
-            type="password",
-            help="Personal access token for GitHub API",
-            key="github_token",
+# Active tool badges (above message input row)
+_badge_parts = []
+for state_key, emoji, name, bg, fg in _BADGES:
+    if st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False)):
+        _badge_parts.append(
+            f'<span style="display:inline-block;background:{bg};color:{fg};'
+            f"font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;"
+            f'margin:0 6px 8px 0;white-space:nowrap">{emoji} {name}</span>'
         )
+if _badge_parts:
+    st.markdown(
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:4px">'
+        + "".join(_badge_parts)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
 
-if prompt := st.chat_input("Message"):
+# + popover (tools) to the left of chat input
+_in_cols = st.columns([0.1, 0.9])
+with _in_cols[0]:
+    with st.popover("➕", use_container_width=True):
+        st.markdown("**Tools**")
+        st.checkbox("🔍 Web Search", key="tool_search")
+        st.checkbox("🌤 Weather", key="tool_weather")
+        st.checkbox("🧮 Calculator", key="tool_calc")
+        st.checkbox("🧠 Memory", key="tool_memory")
+        st.checkbox("🔬 Deep Search", key="tool_deep_search")
+        st.checkbox("🐙 GitHub", key="tool_github")
+        if st.session_state.get("tool_github"):
+            st.text_input(
+                "GitHub token",
+                type="password",
+                help="Personal access token for GitHub API",
+                key="github_token",
+            )
+
+with _in_cols[1]:
+    _chat_raw = st.chat_input("Message")
+
+prompt = (_chat_raw or "").strip()
+if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
     active_tools = {
         "search": st.session_state["tool_search"],
+        "deep_search": st.session_state["tool_deep_search"],
         "weather": st.session_state["tool_weather"],
         "calc": st.session_state["tool_calc"],
         "memory": st.session_state["tool_memory"],
@@ -222,6 +286,8 @@ if prompt := st.chat_input("Message"):
         tool_result = run_weather(prompt)
     elif tool_name == "search":
         tool_result = run_search(prompt)
+    elif tool_name == "deep_search":
+        tool_result = run_deep_search(prompt)
     elif tool_name == "calc":
         tool_result = run_calculator(prompt)
     elif tool_name == "memory":

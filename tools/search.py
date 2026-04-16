@@ -1,7 +1,7 @@
 import re
 from typing import List
 
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 _NOTHING = "Sorry I could not find anything about that."
 _UNAVAILABLE = "Sorry the search is not available right now."

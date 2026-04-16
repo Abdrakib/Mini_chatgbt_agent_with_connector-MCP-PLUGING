@@ -1,7 +1,7 @@
-streamlit
+streamlit>=1.33.0
 torch
 transformers
 accelerate
-duckduckgo-search
+ddgs
 requests
 PyGithub

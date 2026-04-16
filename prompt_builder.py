@@ -1,6 +1,7 @@
 _TOOL_DISPLAY = {
     "weather": "Weather",
     "search": "Search",
+    "deep_search": "Deep Search",
     "calc": "Calculator",
     "memory": "Memory",
     "github": "GitHub",
