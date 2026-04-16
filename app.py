@@ -64,9 +64,6 @@ if "archived_chats" not in st.session_state:
 if "github_token" not in st.session_state:
     st.session_state.github_token = ""
 
-if "sidebar_open" not in st.session_state:
-    st.session_state.sidebar_open = True
-
 for key, default in _TOOL_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -151,70 +148,33 @@ def _render_assistant_footer(tool_key: str) -> None:
     )
 
 
-def _toolbar_css(sidebar_open: bool) -> str:
-    hide_sidebar = ""
-    if not sidebar_open:
-        hide_sidebar = """
-        [data-testid="stSidebar"] { display: none !important; }
-        [data-testid="stSidebarNavLink"] { display: none !important; }
-        """
-    return f"""
-<style>
-{hide_sidebar}
-[data-testid="collapsedControl"] {{ display: none !important; }}
-button[aria-label="Close sidebar"] {{ display: none !important; }}
-section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type {{
-    position: fixed !important;
-    top: 0.65rem !important;
-    left: 0.75rem !important;
-    z-index: 1000002 !important;
-    width: auto !important;
-    min-height: unset !important;
-}}
-section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"] {{
-    width: auto !important;
-    flex: 0 0 auto !important;
-}}
-section.main .block-container {{
-    padding-top: 2.85rem !important;
-}}
-</style>
-"""
+# Sidebar: header-style app name + chat history (Streamlit handles open/close natively)
+st.sidebar.button(
+    "☰ Mini ChatGPT Agent",
+    key="sidebar_app_header",
+    use_container_width=True,
+    help="Use the sidebar edge to collapse or expand",
+)
+if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
+    _archive_current_if_nonempty()
+    st.session_state.messages = []
+    st.rerun()
 
-
-# Fixed hamburger + hide default sidebar control; hide sidebar panel when collapsed
-st.markdown(_toolbar_css(st.session_state.get("sidebar_open", True)), unsafe_allow_html=True)
-
-_hb_cols = st.columns([1, 32])
-with _hb_cols[0]:
-    if st.button("☰", key="hamburger_menu", help="Toggle sidebar"):
-        st.session_state.sidebar_open = not st.session_state.get("sidebar_open", True)
-        st.rerun()
-
-# Sidebar: app name + chat history only (when open)
-if st.session_state.get("sidebar_open", True):
-    with st.sidebar:
-        st.markdown("### 🤖 Mini ChatGPT Agent")
-        if st.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
+st.sidebar.markdown("**Chats**")
+for conv in list(st.session_state.archived_chats):
+    cid = conv["id"]
+    title = conv.get("title") or "Untitled"
+    if st.sidebar.button(
+        title,
+        key=f"sidebar_chat_{cid}",
+        use_container_width=True,
+    ):
+        cur = st.session_state.get("messages") or []
+        target_sig = _messages_signature(conv.get("messages") or [])
+        if cur and _messages_signature(cur) != target_sig:
             _archive_current_if_nonempty()
-            st.session_state.messages = []
-            st.rerun()
-
-        st.markdown("**Chats**")
-        for conv in list(st.session_state.archived_chats):
-            cid = conv["id"]
-            title = conv.get("title") or "Untitled"
-            if st.button(
-                title,
-                key=f"sidebar_chat_{cid}",
-                use_container_width=True,
-            ):
-                cur = st.session_state.get("messages") or []
-                target_sig = _messages_signature(conv.get("messages") or [])
-                if cur and _messages_signature(cur) != target_sig:
-                    _archive_current_if_nonempty()
-                st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
-                st.rerun()
+        st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
+        st.rerun()
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -222,26 +182,26 @@ for message in st.session_state.messages:
         if message["role"] == "assistant":
             _render_assistant_footer(message.get("tool_used", "none"))
 
-# Active tool badges (above message input row)
+# Bottom composer: badges, then + popover + chat input in one row (stays with the input)
 _badge_parts = []
 for state_key, emoji, name, bg, fg in _BADGES:
     if st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False)):
         _badge_parts.append(
             f'<span style="display:inline-block;background:{bg};color:{fg};'
             f"font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;"
-            f'margin:0 6px 8px 0;white-space:nowrap">{emoji} {name}</span>'
+            f'margin:0 6px 6px 0;white-space:nowrap">{emoji} {name}</span>'
         )
 if _badge_parts:
     st.markdown(
-        '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:4px">'
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;'
+        'margin:0 0 6px 0;padding:0 0.25rem 0 0">'
         + "".join(_badge_parts)
         + "</div>",
         unsafe_allow_html=True,
     )
 
-# + popover (tools) to the left of chat input
-_in_cols = st.columns([0.1, 0.9])
-with _in_cols[0]:
+_bottom_cols = st.columns([0.08, 0.92])
+with _bottom_cols[0]:
     with st.popover("➕", use_container_width=True):
         st.markdown("**Tools**")
         st.checkbox("🔍 Web Search", key="tool_search")
@@ -258,7 +218,7 @@ with _in_cols[0]:
                 key="github_token",
             )
 
-with _in_cols[1]:
+with _bottom_cols[1]:
     _chat_raw = st.chat_input("Message")
 
 prompt = (_chat_raw or "").strip()
