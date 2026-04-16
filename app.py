@@ -55,6 +55,15 @@ _BADGES = (
     ("tool_github", "🐙", "GitHub", "#EDE7F6", "#4527A0"),
 )
 
+_SUGGESTED_TOOLS = (
+    ("tool_search", "🔍 Search"),
+    ("tool_weather", "🌤 Weather"),
+    ("tool_calc", "🧮 Calc"),
+    ("tool_memory", "🧠 Memory"),
+    ("tool_deep_search", "🔬 Deep"),
+    ("tool_github", "🐙 GitHub"),
+)
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -63,6 +72,9 @@ if "archived_chats" not in st.session_state:
 
 if "github_token" not in st.session_state:
     st.session_state.github_token = ""
+
+if "composer_draft" not in st.session_state:
+    st.session_state.composer_draft = ""
 
 for key, default in _TOOL_DEFAULTS.items():
     if key not in st.session_state:
@@ -74,6 +86,56 @@ if "auto_enabled_tool" in st.session_state:
         _session_key = _ROUTER_TO_SESSION.get(_enabled)
         if _session_key:
             st.session_state[_session_key] = True
+
+
+def chat_started() -> bool:
+    return bool(st.session_state.get("messages"))
+
+
+def inject_app_css(*, fixed_bottom_composer: bool) -> None:
+    """Layout CSS: padded main when composer is fixed; bottom bar targets .fixed-composer-shell anchor + sibling container."""
+    pad = "120px" if fixed_bottom_composer else "32px"
+    bottom_rules = ""
+    if fixed_bottom_composer:
+        bottom_rules = """
+        /* Anchor lives in first element-container; composer widgets live in the next element-container */
+        section.main div.element-container:has(#bottom-composer-anchor) + div.element-container {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 1000 !important;
+            width: 100% !important;
+            max-width: min(900px, 100vw) !important;
+            margin: 0 auto !important;
+            box-sizing: border-box !important;
+            background: var(--background-color, #ffffff) !important;
+            border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+            padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.06) !important;
+        }
+        @media (max-width: 640px) {
+            section.main div.element-container:has(#bottom-composer-anchor) + div.element-container {
+                max-width: 100% !important;
+                padding-left: max(8px, env(safe-area-inset-left, 0px)) !important;
+                padding-right: max(8px, env(safe-area-inset-right, 0px)) !important;
+            }
+        }
+        """
+    st.markdown(
+        f"""
+<style>
+section.main .block-container {{
+    padding-bottom: {pad} !important;
+    max-width: 900px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}}
+{bottom_rules}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def _messages_signature(messages: list) -> str:
@@ -148,66 +210,9 @@ def _render_assistant_footer(tool_key: str) -> None:
     )
 
 
-st.sidebar.markdown("##### Mini ChatGPT Agent")
-if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
-    _archive_current_if_nonempty()
-    st.session_state.messages = []
-    st.rerun()
-
-st.sidebar.markdown("**Chats**")
-for conv in list(st.session_state.archived_chats):
-    cid = conv["id"]
-    title = conv.get("title") or "Untitled"
-    if st.sidebar.button(
-        title,
-        key=f"sidebar_chat_{cid}",
-        use_container_width=True,
-    ):
-        cur = st.session_state.get("messages") or []
-        target_sig = _messages_signature(conv.get("messages") or [])
-        if cur and _messages_signature(cur) != target_sig:
-            _archive_current_if_nonempty()
-        st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
-        st.rerun()
-
-if not st.session_state.messages:
-    st.markdown(
-        """
-        <div style="text-align:center; padding: 80px 20px 20px 20px; color: #888;">
-        <h2>🤖 Mini ChatGPT Agent</h2>
-        <p>Powered by Qwen2.5 · Ask me anything</p>
-        <p style="font-size:0.85em">Use the ➕ button to enable tools</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if message["role"] == "assistant":
-            _render_assistant_footer(message.get("tool_used", "none"))
-
-_badge_parts = []
-for state_key, emoji, name, bg, fg in _BADGES:
-    if st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False)):
-        _badge_parts.append(
-            f'<span style="display:inline-block;background:{bg};color:{fg};'
-            f"font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;"
-            f'margin:0 6px 6px 0;white-space:nowrap">{emoji} {name}</span>'
-        )
-
-if _badge_parts:
-    st.markdown(
-        '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
-        + "".join(_badge_parts)
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-_tool_cols = st.columns([0.08, 0.92])
-with _tool_cols[0]:
-    with st.popover("➕ Tools"):
+def render_tools_popover() -> None:
+    with st.popover("➕"):
+        st.markdown("**Tools**")
         st.checkbox("🔍 Web Search", key="tool_search")
         st.checkbox("🌤 Weather", key="tool_weather")
         st.checkbox("🧮 Calculator", key="tool_calc")
@@ -215,20 +220,104 @@ with _tool_cols[0]:
         st.checkbox("🔬 Deep Search", key="tool_deep_search")
         st.checkbox("🐙 GitHub", key="tool_github")
         if st.session_state.get("tool_github"):
-            st.text_input(
-                "GitHub token",
-                type="password",
-                key="github_token",
+            st.text_input("GitHub token", type="password", key="github_token")
+
+
+def render_welcome_screen() -> None:
+    st.markdown(
+        """
+        <div style="text-align:center; padding: 48px 20px 16px; color: #666;">
+        <h1 style="margin-bottom:0.35em;">🤖 Mini ChatGPT Agent</h1>
+        <p style="font-size:1.05rem;">Powered by Qwen2.5 · Ask me anything</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<p style="text-align:center;color:#888;margin-bottom:8px;">Suggested tools</p>', unsafe_allow_html=True)
+    n = len(_SUGGESTED_TOOLS)
+    cols = st.columns(n)
+    for i, (state_key, label) in enumerate(_SUGGESTED_TOOLS):
+        with cols[i]:
+            on = st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False))
+            if st.button(
+                label,
+                key=f"welcome_pill_{state_key}",
+                type="primary" if on else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state[state_key] = not on
+                st.rerun()
+
+    _, welcome_mid, _ = st.columns([1, 3, 1])
+    with welcome_mid:
+        c1, c2, c3 = st.columns([1, 6, 1])
+        with c1:
+            render_tools_popover()
+        with c2:
+            st.text_area(
+                "Message",
+                key="composer_draft",
+                height=88,
+                placeholder="Message…",
+                label_visibility="collapsed",
             )
+        with c3:
+            if st.button("Send", type="primary", key="send_msg", use_container_width=True):
+                handle_send()
 
-with _tool_cols[1]:
-    _chat_raw = st.chat_input("Message")
 
-prompt = (_chat_raw or "").strip()
-if prompt:
-    with st.chat_message("user"):
-        st.markdown(prompt)
+def render_tool_badges() -> None:
+    parts = []
+    for state_key, emoji, name, bg, fg in _BADGES:
+        if st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False)):
+            parts.append(
+                f'<span style="display:inline-block;background:{bg};color:{fg};'
+                f"font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;"
+                f'margin:0 6px 6px 0;white-space:nowrap">{emoji} {name}</span>'
+            )
+    if parts:
+        st.markdown(
+            '<div style="display:flex;flex-wrap:wrap;margin-bottom:4px">'
+            + "".join(parts)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
 
+
+def render_messages() -> None:
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if message["role"] == "assistant":
+                _render_assistant_footer(message.get("tool_used", "none"))
+
+
+def render_bottom_composer() -> None:
+    """Fixed bar is styled via #bottom-composer-anchor + next element-container (see inject_app_css)."""
+    st.markdown(
+        '<div id="bottom-composer-anchor" class="fixed-composer-shell" '
+        'style="height:0;margin:0;padding:0;overflow:hidden;" aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    with st.container():
+        col_plus, col_mid, col_send = st.columns([1, 8, 1])
+        with col_plus:
+            render_tools_popover()
+        with col_mid:
+            st.text_area(
+                "Message",
+                key="composer_draft",
+                height=72,
+                placeholder="Message…",
+                label_visibility="collapsed",
+            )
+        with col_send:
+            if st.button("Send", type="primary", key="send_msg", use_container_width=True):
+                handle_send()
+
+
+def process_user_message(prompt: str) -> None:
     active_tools = {
         "search": st.session_state["tool_search"],
         "deep_search": st.session_state["tool_deep_search"],
@@ -261,7 +350,6 @@ if prompt:
         tool_result = ""
 
     memory_context = get_memory_context()
-
     full_prompt = build_prompt(prompt, tool_result, memory_context)
 
     auto_notice = ""
@@ -277,10 +365,6 @@ if prompt:
     body_parts.append(reply)
     content = "\n\n".join(body_parts)
 
-    with st.chat_message("assistant"):
-        st.markdown(content)
-        _render_assistant_footer(tool_name)
-
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.messages.append(
         {
@@ -289,3 +373,61 @@ if prompt:
             "tool_used": tool_name,
         }
     )
+
+
+def handle_send() -> None:
+    """Queue composer text for processing on the next script run (avoids mixing welcome + chat UI)."""
+    t = (st.session_state.get("composer_draft") or "").strip()
+    if t:
+        st.session_state.pending_send_text = t
+    st.rerun()
+
+
+def process_pending_send() -> None:
+    if "pending_send_text" not in st.session_state:
+        return
+    text = st.session_state.pop("pending_send_text")
+    prompt = (text or "").strip()
+    st.session_state.composer_draft = ""
+    if prompt:
+        process_user_message(prompt)
+    st.rerun()
+
+
+# --- Sidebar ---
+st.sidebar.markdown("##### Mini ChatGPT Agent")
+if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
+    _archive_current_if_nonempty()
+    st.session_state.messages = []
+    st.session_state.composer_draft = ""
+    st.session_state.pop("pending_send_text", None)
+    st.rerun()
+
+st.sidebar.markdown("**Chats**")
+for conv in list(st.session_state.archived_chats):
+    cid = conv["id"]
+    title = conv.get("title") or "Untitled"
+    if st.sidebar.button(
+        title,
+        key=f"sidebar_chat_{cid}",
+        use_container_width=True,
+    ):
+        cur = st.session_state.get("messages") or []
+        target_sig = _messages_signature(conv.get("messages") or [])
+        if cur and _messages_signature(cur) != target_sig:
+            _archive_current_if_nonempty()
+        st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
+        st.session_state.composer_draft = ""
+        st.rerun()
+
+process_pending_send()
+
+started = chat_started()
+inject_app_css(fixed_bottom_composer=started)
+
+if not started:
+    render_welcome_screen()
+else:
+    render_messages()
+    render_tool_badges()
+    render_bottom_composer()
