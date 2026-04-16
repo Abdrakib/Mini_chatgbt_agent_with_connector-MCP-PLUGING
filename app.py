@@ -64,9 +64,6 @@ if "archived_chats" not in st.session_state:
 if "github_token" not in st.session_state:
     st.session_state.github_token = ""
 
-if "sidebar_open" not in st.session_state:
-    st.session_state.sidebar_open = True
-
 for key, default in _TOOL_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -77,27 +74,6 @@ if "auto_enabled_tool" in st.session_state:
         _session_key = _ROUTER_TO_SESSION.get(_enabled)
         if _session_key:
             st.session_state[_session_key] = True
-
-
-def _main_css(sidebar_open: bool) -> str:
-    hide = ""
-    if not sidebar_open:
-        hide = "section[data-testid=\"stSidebar\"] { display: none !important; }\n"
-    return f"""
-<style>
-{hide}
-div[data-testid="stVerticalBlock"] > div:first-child button {{
-    position: fixed;
-    top: 0.5rem;
-    left: 0.5rem;
-    z-index: 99999;
-    width: 2rem;
-    height: 2rem;
-    padding: 0;
-    font-size: 1rem;
-}}
-</style>
-"""
 
 
 def _messages_signature(messages: list) -> str:
@@ -172,12 +148,6 @@ def _render_assistant_footer(tool_key: str) -> None:
     )
 
 
-st.markdown(_main_css(st.session_state.get("sidebar_open", True)), unsafe_allow_html=True)
-
-if st.button("☰", key="toggle_sidebar", type="secondary"):
-    st.session_state.sidebar_open = not st.session_state.get("sidebar_open", True)
-    st.rerun()
-
 st.sidebar.markdown("##### Mini ChatGPT Agent")
 if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
     _archive_current_if_nonempty()
@@ -205,6 +175,18 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
         if message["role"] == "assistant":
             _render_assistant_footer(message.get("tool_used", "none"))
+
+if not st.session_state.messages:
+    st.markdown(
+        """
+        <div style="text-align:center; padding: 80px 20px 20px 20px; color: #888;">
+        <h2>🤖 Mini ChatGPT Agent</h2>
+        <p>Powered by Qwen2.5 · Ask me anything</p>
+        <p style="font-size:0.85em">Use the ➕ button to enable tools</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 _badge_parts = []
 for state_key, emoji, name, bg, fg in _BADGES:
