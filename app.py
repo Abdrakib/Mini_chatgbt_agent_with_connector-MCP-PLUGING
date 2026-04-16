@@ -64,6 +64,9 @@ if "archived_chats" not in st.session_state:
 if "github_token" not in st.session_state:
     st.session_state.github_token = ""
 
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = True
+
 for key, default in _TOOL_DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -74,6 +77,56 @@ if "auto_enabled_tool" in st.session_state:
         _session_key = _ROUTER_TO_SESSION.get(_enabled)
         if _session_key:
             st.session_state[_session_key] = True
+
+
+def _layout_css(sidebar_open: bool) -> str:
+    hide_sb = ""
+    if not sidebar_open:
+        hide_sb = """
+        section[data-testid="stSidebar"] { display: none !important; }
+        """
+    return f"""
+<style>
+{hide_sb}
+[data-testid="collapsedControl"] {{ display: none !important; }}
+section.main .block-container {{
+    padding-top: 48px !important;
+    padding-bottom: 200px !important;
+}}
+section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type {{
+    position: fixed !important;
+    top: 10px !important;
+    left: 10px !important;
+    z-index: 9999 !important;
+    width: auto !important;
+    min-height: unset !important;
+}}
+section.main div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"] {{
+    flex: 0 0 auto !important;
+    width: auto !important;
+}}
+.bottom-bar {{
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 10px 20px;
+    z-index: 999;
+    box-sizing: border-box;
+}}
+div[data-testid="stVerticalBlock"]:has([data-testid="stChatInput"]) {{
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: white !important;
+    padding: 10px 20px !important;
+    z-index: 999 !important;
+    box-sizing: border-box !important;
+}}
+</style>
+"""
 
 
 def _messages_signature(messages: list) -> str:
@@ -148,13 +201,16 @@ def _render_assistant_footer(tool_key: str) -> None:
     )
 
 
-# Sidebar: header-style app name + chat history (Streamlit handles open/close natively)
-st.sidebar.button(
-    "☰ Mini ChatGPT Agent",
-    key="sidebar_app_header",
-    use_container_width=True,
-    help="Use the sidebar edge to collapse or expand",
-)
+st.markdown(_layout_css(st.session_state.get("sidebar_open", True)), unsafe_allow_html=True)
+
+_h_cols = st.columns([1, 32])
+with _h_cols[0]:
+    if st.button("☰", key="hamburger_sidebar_toggle", help="Toggle sidebar"):
+        st.session_state.sidebar_open = not st.session_state.get("sidebar_open", True)
+        st.rerun()
+
+# Sidebar: small app name, New chat, history (no hamburger in sidebar)
+st.sidebar.markdown("##### Mini ChatGPT Agent")
 if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
     _archive_current_if_nonempty()
     st.session_state.messages = []
@@ -182,7 +238,6 @@ for message in st.session_state.messages:
         if message["role"] == "assistant":
             _render_assistant_footer(message.get("tool_used", "none"))
 
-# Bottom composer: badges, then + popover + chat input in one row (stays with the input)
 _badge_parts = []
 for state_key, emoji, name, bg, fg in _BADGES:
     if st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False)):
@@ -191,35 +246,35 @@ for state_key, emoji, name, bg, fg in _BADGES:
             f"font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;"
             f'margin:0 6px 6px 0;white-space:nowrap">{emoji} {name}</span>'
         )
-if _badge_parts:
-    st.markdown(
-        '<div style="display:flex;flex-wrap:wrap;align-items:center;'
-        'margin:0 0 6px 0;padding:0 0.25rem 0 0">'
-        + "".join(_badge_parts)
-        + "</div>",
-        unsafe_allow_html=True,
-    )
 
-_bottom_cols = st.columns([0.08, 0.92])
-with _bottom_cols[0]:
-    with st.popover("➕", use_container_width=True):
-        st.markdown("**Tools**")
-        st.checkbox("🔍 Web Search", key="tool_search")
-        st.checkbox("🌤 Weather", key="tool_weather")
-        st.checkbox("🧮 Calculator", key="tool_calc")
-        st.checkbox("🧠 Memory", key="tool_memory")
-        st.checkbox("🔬 Deep Search", key="tool_deep_search")
-        st.checkbox("🐙 GitHub", key="tool_github")
-        if st.session_state.get("tool_github"):
-            st.text_input(
-                "GitHub token",
-                type="password",
-                help="Personal access token for GitHub API",
-                key="github_token",
-            )
+with st.container():
+    if _badge_parts:
+        st.markdown(
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
+            + "".join(_badge_parts)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+    _bottom_cols = st.columns([0.08, 0.92])
+    with _bottom_cols[0]:
+        with st.popover("➕", use_container_width=True):
+            st.markdown("**Tools**")
+            st.checkbox("🔍 Web Search", key="tool_search")
+            st.checkbox("🌤 Weather", key="tool_weather")
+            st.checkbox("🧮 Calculator", key="tool_calc")
+            st.checkbox("🧠 Memory", key="tool_memory")
+            st.checkbox("🔬 Deep Search", key="tool_deep_search")
+            st.checkbox("🐙 GitHub", key="tool_github")
+            if st.session_state.get("tool_github"):
+                st.text_input(
+                    "GitHub token",
+                    type="password",
+                    help="Personal access token for GitHub API",
+                    key="github_token",
+                )
 
-with _bottom_cols[1]:
-    _chat_raw = st.chat_input("Message")
+    with _bottom_cols[1]:
+        _chat_raw = st.chat_input("Message")
 
 prompt = (_chat_raw or "").strip()
 if prompt:
