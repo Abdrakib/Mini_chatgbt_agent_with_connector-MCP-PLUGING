@@ -205,26 +205,21 @@ if _badge_parts:
         unsafe_allow_html=True,
     )
 
-_bottom_cols = st.columns([0.08, 0.92])
-with _bottom_cols[0]:
-    with st.popover("➕", use_container_width=True):
-        st.markdown("**Tools**")
-        st.checkbox("🔍 Web Search", key="tool_search")
-        st.checkbox("🌤 Weather", key="tool_weather")
-        st.checkbox("🧮 Calculator", key="tool_calc")
-        st.checkbox("🧠 Memory", key="tool_memory")
-        st.checkbox("🔬 Deep Search", key="tool_deep_search")
-        st.checkbox("🐙 GitHub", key="tool_github")
-        if st.session_state.get("tool_github"):
-            st.text_input(
-                "GitHub token",
-                type="password",
-                help="Personal access token for GitHub API",
-                key="github_token",
-            )
+with st.popover("➕ Tools"):
+    st.checkbox("🔍 Web Search", key="tool_search")
+    st.checkbox("🌤 Weather", key="tool_weather")
+    st.checkbox("🧮 Calculator", key="tool_calc")
+    st.checkbox("🧠 Memory", key="tool_memory")
+    st.checkbox("🔬 Deep Search", key="tool_deep_search")
+    st.checkbox("🐙 GitHub", key="tool_github")
+    if st.session_state.get("tool_github"):
+        st.text_input(
+            "GitHub token",
+            type="password",
+            key="github_token",
+        )
 
-with _bottom_cols[1]:
-    _chat_raw = st.chat_input("Message")
+_chat_raw = st.chat_input("Message")
 
 prompt = (_chat_raw or "").strip()
 if prompt:
