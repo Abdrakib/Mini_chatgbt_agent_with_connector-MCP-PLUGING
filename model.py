@@ -56,11 +56,12 @@ def generate_response(prompt: str) -> str:
     with torch.inference_mode():
         output_ids = _MODEL.generate(
             **inputs,
-            max_new_tokens=512,
+            max_new_tokens=100,
             temperature=0.7,
             top_p=0.95,
             do_sample=True,
             repetition_penalty=1.3,
+            eos_token_id=_TOKENIZER.eos_token_id,
         )
 
     input_len = inputs["input_ids"].shape[-1]

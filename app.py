@@ -115,9 +115,11 @@ for message in st.session_state.messages:
             _render_assistant_footer(message.get("tool_used", "none"))
 
 if prompt := st.chat_input("Message"):
+    # 1. Show the user message immediately
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # 2. Build active_tools dict
     active_tools = {
         "search": st.session_state["tool_search"],
         "weather": st.session_state["tool_weather"],
@@ -126,17 +128,15 @@ if prompt := st.chat_input("Message"):
         "github": st.session_state["tool_github"],
     }
 
+    # 3. Route to a tool (may queue auto-enable for next run)
     routed = route(prompt, active_tools)
     if routed.get("auto_enabled"):
         st.session_state["auto_enabled_tool"] = routed["tool"]
 
-    auto_notice = ""
-    if routed.get("auto_enabled") and routed.get("tool") not in (None, "none"):
-        auto_notice = build_auto_enable_notice(routed["tool"])
-
     tool_name = routed["tool"]
     tool_result = ""
 
+    # 4. Run the detected tool
     if tool_name == "weather":
         tool_result = run_weather(prompt)
     elif tool_name == "search":
@@ -150,9 +150,17 @@ if prompt := st.chat_input("Message"):
     elif tool_name == "none":
         tool_result = ""
 
+    # 5. Memory context for the prompt
     memory_context = get_memory_context()
+
+    # 6. Build the LLM prompt
     full_prompt = build_prompt(prompt, tool_result, memory_context)
 
+    auto_notice = ""
+    if routed.get("auto_enabled") and routed.get("tool") not in (None, "none"):
+        auto_notice = build_auto_enable_notice(routed["tool"])
+
+    # 7. Generate (spinner until the model returns)
     with st.spinner("Thinking..."):
         reply = generate_response(full_prompt)
 
@@ -162,10 +170,12 @@ if prompt := st.chat_input("Message"):
     body_parts.append(reply)
     content = "\n\n".join(body_parts)
 
+    # 8. Show the assistant reply immediately
     with st.chat_message("assistant"):
         st.markdown(content)
         _render_assistant_footer(tool_name)
 
+    # 9. Persist chat history (next run redraws from session_state only)
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.messages.append(
         {
