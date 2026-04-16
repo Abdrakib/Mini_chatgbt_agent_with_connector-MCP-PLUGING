@@ -4,11 +4,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 _MODEL = None
 _TOKENIZER = None
 
-_MODEL_ID = "microsoft/Phi-3-mini-4k-instruct"
+_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 
 _SYSTEM_MESSAGE = (
     "You are a helpful assistant. Always reply in English only. "
-    "Keep replies short and under 3 sentences. Never reply in French, Spanish, Italian or any other language."
+    "Keep replies under 3 sentences. Never add hashtags or fake information."
 )
 
 
@@ -17,7 +17,7 @@ def _load_model() -> None:
     if _MODEL is not None:
         return
 
-    _TOKENIZER = AutoTokenizer.from_pretrained(_MODEL_ID, trust_remote_code=True)
+    _TOKENIZER = AutoTokenizer.from_pretrained(_MODEL_ID)
     if _TOKENIZER.pad_token is None:
         _TOKENIZER.pad_token = _TOKENIZER.eos_token
 
@@ -25,7 +25,6 @@ def _load_model() -> None:
         _MODEL_ID,
         torch_dtype=torch.float16,
         device_map="auto",
-        trust_remote_code=True,
     )
     _MODEL.eval()
     print("Model loaded successfully")
