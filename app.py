@@ -170,12 +170,6 @@ for conv in list(st.session_state.archived_chats):
         st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
         st.rerun()
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if message["role"] == "assistant":
-            _render_assistant_footer(message.get("tool_used", "none"))
-
 if not st.session_state.messages:
     st.markdown(
         """
@@ -187,6 +181,12 @@ if not st.session_state.messages:
         """,
         unsafe_allow_html=True,
     )
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        if message["role"] == "assistant":
+            _render_assistant_footer(message.get("tool_used", "none"))
 
 _badge_parts = []
 for state_key, emoji, name, bg, fg in _BADGES:
