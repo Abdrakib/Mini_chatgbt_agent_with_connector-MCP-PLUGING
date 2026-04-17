@@ -55,15 +55,6 @@ _BADGES = (
     ("tool_github", "🐙", "GitHub", "#EDE7F6", "#4527A0"),
 )
 
-_SUGGESTED_TOOLS = (
-    ("tool_search", "🔍 Search"),
-    ("tool_weather", "🌤 Weather"),
-    ("tool_calc", "🧮 Calc"),
-    ("tool_memory", "🧠 Memory"),
-    ("tool_deep_search", "🔬 Deep"),
-    ("tool_github", "🐙 GitHub"),
-)
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -122,6 +113,51 @@ def inject_app_css(*, fixed_bottom_composer: bool) -> None:
             }
         }
         """
+    composer_skin = """
+/* One unified “chat bar”: bordered shell + soft textarea + compact send */
+section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) {
+    border-radius: 999px !important;
+    border: 1px solid rgba(49, 51, 63, 0.12) !important;
+    background: rgba(49, 51, 63, 0.04) !important;
+    padding: 6px 8px 6px 10px !important;
+    box-shadow: 0 1px 2px rgba(49, 51, 63, 0.06) !important;
+}
+section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="stHorizontalBlock"] {
+    align-items: center !important;
+}
+section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="stTextArea"] {
+    margin-bottom: 0 !important;
+}
+section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) textarea {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 10px 12px !important;
+    min-height: 44px !important;
+    line-height: 1.45 !important;
+    resize: none !important;
+}
+section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="column"]:has(button) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="column"]:has(button) button {
+    border-radius: 999px !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    min-width: 36px !important;
+    max-height: 36px !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+"""
     st.markdown(
         f"""
 <style>
@@ -132,6 +168,7 @@ section.main .block-container {{
     margin-right: auto !important;
 }}
 {bottom_rules}
+{composer_skin}
 </style>
 """,
         unsafe_allow_html=True,
@@ -226,45 +263,32 @@ def render_tools_popover() -> None:
 def render_welcome_screen() -> None:
     st.markdown(
         """
-        <div style="text-align:center; padding: 48px 20px 16px; color: #666;">
-        <h1 style="margin-bottom:0.35em;">🤖 Mini ChatGPT Agent</h1>
-        <p style="font-size:1.05rem;">Powered by Qwen2.5 · Ask me anything</p>
+        <div style="text-align:center; padding: 80px 20px 20px 20px; color: #888;">
+        <h2>🤖 Mini ChatGPT Agent</h2>
+        <p>Powered by Qwen2.5 · Ask me anything</p>
+        <p style="font-size:0.85em">Use the ➕ button to enable tools</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown('<p style="text-align:center;color:#888;margin-bottom:8px;">Suggested tools</p>', unsafe_allow_html=True)
-    n = len(_SUGGESTED_TOOLS)
-    cols = st.columns(n)
-    for i, (state_key, label) in enumerate(_SUGGESTED_TOOLS):
-        with cols[i]:
-            on = st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False))
-            if st.button(
-                label,
-                key=f"welcome_pill_{state_key}",
-                type="primary" if on else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state[state_key] = not on
-                st.rerun()
-
-    _, welcome_mid, _ = st.columns([1, 3, 1])
-    with welcome_mid:
-        c1, c2, c3 = st.columns([1, 6, 1])
-        with c1:
+    with st.container(border=True):
+        col_plus, col_input = st.columns([1, 11])
+        with col_plus:
             render_tools_popover()
-        with c2:
-            st.text_area(
-                "Message",
-                key="composer_draft",
-                height=88,
-                placeholder="Message…",
-                label_visibility="collapsed",
-            )
-        with c3:
-            if st.button("Send", type="primary", key="send_msg", use_container_width=True):
-                handle_send()
+        with col_input:
+            ta, btn = st.columns([6, 1])
+            with ta:
+                st.text_area(
+                    "Message",
+                    key="composer_draft",
+                    height=88,
+                    placeholder="Message…",
+                    label_visibility="collapsed",
+                )
+            with btn:
+                if st.button("↑", type="primary", key="send_msg", help="Send", use_container_width=False):
+                    handle_send()
 
 
 def render_tool_badges() -> None:
@@ -301,20 +325,23 @@ def render_bottom_composer() -> None:
         unsafe_allow_html=True,
     )
     with st.container():
-        col_plus, col_mid, col_send = st.columns([1, 8, 1])
-        with col_plus:
-            render_tools_popover()
-        with col_mid:
-            st.text_area(
-                "Message",
-                key="composer_draft",
-                height=72,
-                placeholder="Message…",
-                label_visibility="collapsed",
-            )
-        with col_send:
-            if st.button("Send", type="primary", key="send_msg", use_container_width=True):
-                handle_send()
+        with st.container(border=True):
+            col_plus, col_mid = st.columns([1, 11])
+            with col_plus:
+                render_tools_popover()
+            with col_mid:
+                ta, btn = st.columns([6, 1])
+                with ta:
+                    st.text_area(
+                        "Message",
+                        key="composer_draft",
+                        height=72,
+                        placeholder="Message…",
+                        label_visibility="collapsed",
+                    )
+                with btn:
+                    if st.button("↑", type="primary", key="send_msg", help="Send", use_container_width=False):
+                        handle_send()
 
 
 def process_user_message(prompt: str) -> None:
