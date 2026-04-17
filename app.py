@@ -1,7 +1,4 @@
-import json
-import uuid
-
-import streamlit as st
+import gradio as gr
 
 from model import generate_response
 from prompt_builder import build_auto_enable_notice, build_prompt
@@ -13,448 +10,155 @@ from tools.memory import get_memory_context, run_memory
 from tools.search import run_search
 from tools.weather import run_weather
 
-st.set_page_config(
-    page_title="Mini ChatGPT Agent",
-    page_icon="🤖",
-)
-
-_TOOL_DEFAULTS = {
-    "tool_search": True,
-    "tool_weather": True,
-    "tool_calc": True,
-    "tool_memory": True,
-    "tool_deep_search": True,
-    "tool_github": False,
+# ── Tool state (module-level so it persists per session) ──────────────────────
+_tool_state = {
+    "search":      True,
+    "weather":     True,
+    "calc":        True,
+    "memory":      True,
+    "deep_search": True,
+    "github":      False,
 }
 
-_ROUTER_TO_SESSION = {
-    "search": "tool_search",
-    "deep_search": "tool_deep_search",
-    "weather": "tool_weather",
-    "calc": "tool_calc",
-    "memory": "tool_memory",
-    "github": "tool_github",
-}
-
-_TOOL_USED_LABEL = {
-    "weather": "Weather",
-    "search": "Web Search",
-    "deep_search": "Deep Search",
-    "calc": "Calculator",
-    "memory": "Memory",
-    "github": "GitHub",
-    "none": "No tool",
-}
-
-_BADGES = (
-    ("tool_search", "🔍", "Web Search", "#E3F2FD", "#1565C0"),
-    ("tool_weather", "🌤", "Weather", "#FFF3E0", "#E65100"),
-    ("tool_calc", "🧮", "Calculator", "#E8F5E9", "#2E7D32"),
-    ("tool_memory", "🧠", "Memory", "#F3E5F5", "#6A1B9A"),
-    ("tool_deep_search", "🔬", "Deep Search", "#E0F7FA", "#006064"),
-    ("tool_github", "🐙", "GitHub", "#EDE7F6", "#4527A0"),
-)
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "archived_chats" not in st.session_state:
-    st.session_state.archived_chats = []
-
-if "github_token" not in st.session_state:
-    st.session_state.github_token = ""
-
-if "composer_draft" not in st.session_state:
-    st.session_state.composer_draft = ""
-
-for key, default in _TOOL_DEFAULTS.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
-
-if "auto_enabled_tool" in st.session_state:
-    _enabled = st.session_state.pop("auto_enabled_tool")
-    if _enabled and _enabled != "none":
-        _session_key = _ROUTER_TO_SESSION.get(_enabled)
-        if _session_key:
-            st.session_state[_session_key] = True
+_github_token = {"value": ""}
 
 
-def chat_started() -> bool:
-    return bool(st.session_state.get("messages"))
+# ── Core chat function ─────────────────────────────────────────────────────────
+def chat(user_message: str, history: list) -> tuple:
+    if not user_message.strip():
+        return history, ""
 
+    active_tools = dict(_tool_state)
+    routed = route(user_message, active_tools)
 
-def inject_app_css(*, fixed_bottom_composer: bool) -> None:
-    """Layout CSS: padded main when composer is fixed; bottom bar targets .fixed-composer-shell anchor + sibling container."""
-    pad = "120px" if fixed_bottom_composer else "32px"
-    bottom_rules = ""
-    if fixed_bottom_composer:
-        bottom_rules = """
-        /* Anchor lives in first element-container; composer widgets live in the next element-container */
-        section.main div.element-container:has(#bottom-composer-anchor) + div.element-container {
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            z-index: 1000 !important;
-            width: 100% !important;
-            max-width: min(900px, 100vw) !important;
-            margin: 0 auto !important;
-            box-sizing: border-box !important;
-            background: var(--background-color, #ffffff) !important;
-            border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
-            padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.06) !important;
-        }
-        @media (max-width: 640px) {
-            section.main div.element-container:has(#bottom-composer-anchor) + div.element-container {
-                max-width: 100% !important;
-                padding-left: max(8px, env(safe-area-inset-left, 0px)) !important;
-                padding-right: max(8px, env(safe-area-inset-right, 0px)) !important;
-            }
-        }
-        """
-    composer_skin = """
-/* One unified “chat bar”: bordered shell + soft textarea + compact send */
-section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) {
-    border-radius: 999px !important;
-    border: 1px solid rgba(49, 51, 63, 0.12) !important;
-    background: rgba(49, 51, 63, 0.04) !important;
-    padding: 6px 8px 6px 10px !important;
-    box-shadow: 0 1px 2px rgba(49, 51, 63, 0.06) !important;
-}
-section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="stHorizontalBlock"] {
-    align-items: center !important;
-}
-section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="stTextArea"] {
-    margin-bottom: 0 !important;
-}
-section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) textarea {
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    padding: 10px 12px !important;
-    min-height: 44px !important;
-    line-height: 1.45 !important;
-    resize: none !important;
-}
-section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="column"]:has(button) {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-section.main [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stTextArea"]) [data-testid="column"]:has(button) button {
-    border-radius: 999px !important;
-    width: 36px !important;
-    height: 36px !important;
-    min-height: 36px !important;
-    min-width: 36px !important;
-    max-height: 36px !important;
-    padding: 0 !important;
-    font-size: 1rem !important;
-    font-weight: 600 !important;
-    line-height: 1 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-"""
-    st.markdown(
-        f"""
-<style>
-section.main .block-container {{
-    padding-bottom: {pad} !important;
-    max-width: 900px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-}}
-{bottom_rules}
-{composer_skin}
-</style>
-""",
-        unsafe_allow_html=True,
-    )
-
-
-def _messages_signature(messages: list) -> str:
-    try:
-        return json.dumps(
-            [
-                {"role": m.get("role"), "content": m.get("content"), "tool_used": m.get("tool_used")}
-                for m in messages
-            ],
-            sort_keys=True,
-        )
-    except (TypeError, ValueError):
-        return ""
-
-
-def _first_user_title(messages: list, max_len: int = 48) -> str:
-    for m in messages:
-        if m.get("role") == "user":
-            t = (m.get("content") or "").strip().replace("\n", " ")
-            if not t:
-                continue
-            return t[:max_len] + ("…" if len(t) > max_len else "")
-    return "Empty chat"
-
-
-def _archive_current_if_nonempty() -> None:
-    msgs = st.session_state.get("messages") or []
-    if not msgs:
-        return
-    st.session_state.archived_chats.insert(
-        0,
-        {
-            "id": str(uuid.uuid4()),
-            "title": _first_user_title(msgs),
-            "messages": [dict(m) for m in msgs],
-        },
-    )
-
-
-def _active_tools_label() -> str:
-    labels = []
-    if st.session_state.get("tool_search", True):
-        labels.append("Web Search")
-    if st.session_state.get("tool_weather", True):
-        labels.append("Weather")
-    if st.session_state.get("tool_calc", True):
-        labels.append("Calculator")
-    if st.session_state.get("tool_memory", True):
-        labels.append("Memory")
-    if st.session_state.get("tool_deep_search", True):
-        labels.append("Deep Search")
-    if st.session_state.get("tool_github", False):
-        labels.append("GitHub")
-    return ", ".join(labels) if labels else "None"
-
-
-def _tool_used_line(tool_key: str) -> str:
-    k = tool_key or "none"
-    return _TOOL_USED_LABEL.get(k, k.title() if k else "No tool")
-
-
-def _render_assistant_footer(tool_key: str) -> None:
-    st.markdown(
-        f'<p style="color:#888;font-size:0.85em;margin-top:0.5rem;">'
-        f"Tool used: {_tool_used_line(tool_key)}</p>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<p style="color:#888;font-size:0.85em;">'
-        f"Tools on: {_active_tools_label()}</p>",
-        unsafe_allow_html=True,
-    )
-
-
-def render_tools_popover() -> None:
-    with st.popover("➕"):
-        st.markdown("**Tools**")
-        st.checkbox("🔍 Web Search", key="tool_search")
-        st.checkbox("🌤 Weather", key="tool_weather")
-        st.checkbox("🧮 Calculator", key="tool_calc")
-        st.checkbox("🧠 Memory", key="tool_memory")
-        st.checkbox("🔬 Deep Search", key="tool_deep_search")
-        st.checkbox("🐙 GitHub", key="tool_github")
-        if st.session_state.get("tool_github"):
-            st.text_input("GitHub token", type="password", key="github_token")
-
-
-def render_welcome_screen() -> None:
-    st.markdown(
-        """
-        <div style="text-align:center; padding: 80px 20px 20px 20px; color: #888;">
-        <h2>🤖 Mini ChatGPT Agent</h2>
-        <p>Powered by Qwen2.5 · Ask me anything</p>
-        <p style="font-size:0.85em">Use the ➕ button to enable tools</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    with st.container(border=True):
-        col_plus, col_input = st.columns([1, 11])
-        with col_plus:
-            render_tools_popover()
-        with col_input:
-            ta, btn = st.columns([6, 1])
-            with ta:
-                st.text_area(
-                    "Message",
-                    key="composer_draft",
-                    height=88,
-                    placeholder="Message…",
-                    label_visibility="collapsed",
-                )
-            with btn:
-                if st.button("↑", type="primary", key="send_msg", help="Send", use_container_width=False):
-                    handle_send()
-
-
-def render_tool_badges() -> None:
-    parts = []
-    for state_key, emoji, name, bg, fg in _BADGES:
-        if st.session_state.get(state_key, _TOOL_DEFAULTS.get(state_key, False)):
-            parts.append(
-                f'<span style="display:inline-block;background:{bg};color:{fg};'
-                f"font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:999px;"
-                f'margin:0 6px 6px 0;white-space:nowrap">{emoji} {name}</span>'
-            )
-    if parts:
-        st.markdown(
-            '<div style="display:flex;flex-wrap:wrap;margin-bottom:4px">'
-            + "".join(parts)
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-
-
-def render_messages() -> None:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if message["role"] == "assistant":
-                _render_assistant_footer(message.get("tool_used", "none"))
-
-
-def render_bottom_composer() -> None:
-    """Fixed bar is styled via #bottom-composer-anchor + next element-container (see inject_app_css)."""
-    st.markdown(
-        '<div id="bottom-composer-anchor" class="fixed-composer-shell" '
-        'style="height:0;margin:0;padding:0;overflow:hidden;" aria-hidden="true"></div>',
-        unsafe_allow_html=True,
-    )
-    with st.container():
-        with st.container(border=True):
-            col_plus, col_mid = st.columns([1, 11])
-            with col_plus:
-                render_tools_popover()
-            with col_mid:
-                ta, btn = st.columns([6, 1])
-                with ta:
-                    st.text_area(
-                        "Message",
-                        key="composer_draft",
-                        height=72,
-                        placeholder="Message…",
-                        label_visibility="collapsed",
-                    )
-                with btn:
-                    if st.button("↑", type="primary", key="send_msg", help="Send", use_container_width=False):
-                        handle_send()
-
-
-def process_user_message(prompt: str) -> None:
-    active_tools = {
-        "search": st.session_state["tool_search"],
-        "deep_search": st.session_state["tool_deep_search"],
-        "weather": st.session_state["tool_weather"],
-        "calc": st.session_state["tool_calc"],
-        "memory": st.session_state["tool_memory"],
-        "github": st.session_state["tool_github"],
-    }
-
-    routed = route(prompt, active_tools)
+    # Update tool state if auto-enabled
     if routed.get("auto_enabled"):
-        st.session_state["auto_enabled_tool"] = routed["tool"]
+        tool = routed.get("tool")
+        if tool and tool != "none":
+            _tool_state[tool] = True
 
     tool_name = routed["tool"]
     tool_result = ""
 
     if tool_name == "weather":
-        tool_result = run_weather(prompt)
+        tool_result = run_weather(user_message)
     elif tool_name == "search":
-        tool_result = run_search(prompt)
+        tool_result = run_search(user_message)
     elif tool_name == "deep_search":
-        tool_result = run_deep_search(prompt)
+        tool_result = run_deep_search(user_message)
     elif tool_name == "calc":
-        tool_result = run_calculator(prompt)
+        tool_result = run_calculator(user_message)
     elif tool_name == "memory":
-        tool_result = run_memory(prompt)
+        tool_result = run_memory(user_message)
     elif tool_name == "github":
-        tool_result = run_github(prompt, st.session_state.get("github_token", ""))
-    elif tool_name == "none":
-        tool_result = ""
+        tool_result = run_github(user_message, _github_token["value"])
 
     memory_context = get_memory_context()
-    full_prompt = build_prompt(prompt, tool_result, memory_context)
+    full_prompt = build_prompt(user_message, tool_result, memory_context)
 
     auto_notice = ""
-    if routed.get("auto_enabled") and routed.get("tool") not in (None, "none"):
-        auto_notice = build_auto_enable_notice(routed["tool"])
+    if routed.get("auto_enabled") and tool_name not in (None, "none"):
+        auto_notice = build_auto_enable_notice(tool_name)
 
-    with st.spinner("Thinking..."):
-        reply = generate_response(full_prompt)
+    reply = generate_response(full_prompt)
 
-    body_parts = []
     if auto_notice:
-        body_parts.append(auto_notice)
-    body_parts.append(reply)
-    content = "\n\n".join(body_parts)
+        reply = f"{auto_notice}\n\n{reply}"
 
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": content,
-            "tool_used": tool_name,
-        }
-    )
+    # Add tool info footer
+    tool_label = {
+        "weather": "🌤 Weather",
+        "search": "🔍 Web Search",
+        "deep_search": "🔬 Deep Search",
+        "calc": "🧮 Calculator",
+        "memory": "🧠 Memory",
+        "github": "🐙 GitHub",
+        "none": "No tool",
+    }.get(tool_name, "No tool")
 
+    reply += f"\n\n*Tool used: {tool_label}*"
 
-def handle_send() -> None:
-    """Queue composer text for processing on the next script run (avoids mixing welcome + chat UI)."""
-    t = (st.session_state.get("composer_draft") or "").strip()
-    if t:
-        st.session_state.pending_send_text = t
-    st.rerun()
+    history.append((user_message, reply))
+    return history, ""
 
 
-def process_pending_send() -> None:
-    if "pending_send_text" not in st.session_state:
-        return
-    text = st.session_state.pop("pending_send_text")
-    prompt = (text or "").strip()
-    st.session_state.composer_draft = ""
-    if prompt:
-        process_user_message(prompt)
-    st.rerun()
+# ── Tool toggle functions ──────────────────────────────────────────────────────
+def toggle_search(val):   _tool_state["search"] = val
+def toggle_weather(val):  _tool_state["weather"] = val
+def toggle_calc(val):     _tool_state["calc"] = val
+def toggle_memory(val):   _tool_state["memory"] = val
+def toggle_deep(val):     _tool_state["deep_search"] = val
+def toggle_github(val):   _tool_state["github"] = val
+def update_token(val):    _github_token["value"] = val
 
 
-# --- Sidebar ---
-st.sidebar.markdown("##### Mini ChatGPT Agent")
-if st.sidebar.button("➕ New chat", use_container_width=True, key="new_chat_btn"):
-    _archive_current_if_nonempty()
-    st.session_state.messages = []
-    st.session_state.composer_draft = ""
-    st.session_state.pop("pending_send_text", None)
-    st.rerun()
+# ── Gradio UI ──────────────────────────────────────────────────────────────────
+with gr.Blocks(
+    title="Mini ChatGPT Agent",
+    theme=gr.themes.Soft(),
+    css="""
+    #chatbot { height: 500px; }
+    .tool-row { gap: 8px; }
+    footer { display: none !important; }
+    """,
+) as demo:
 
-st.sidebar.markdown("**Chats**")
-for conv in list(st.session_state.archived_chats):
-    cid = conv["id"]
-    title = conv.get("title") or "Untitled"
-    if st.sidebar.button(
-        title,
-        key=f"sidebar_chat_{cid}",
-        use_container_width=True,
-    ):
-        cur = st.session_state.get("messages") or []
-        target_sig = _messages_signature(conv.get("messages") or [])
-        if cur and _messages_signature(cur) != target_sig:
-            _archive_current_if_nonempty()
-        st.session_state.messages = [dict(m) for m in (conv.get("messages") or [])]
-        st.session_state.composer_draft = ""
-        st.rerun()
+    gr.Markdown("# 🤖 Mini ChatGPT Agent")
+    gr.Markdown("*Powered by Qwen2.5 · Web Search · Weather · Calculator · Memory · Deep Search · GitHub*")
 
-process_pending_send()
+    with gr.Row():
+        # ── Sidebar ──────────────────────────────────────────────────────────
+        with gr.Column(scale=1, min_width=200):
+            gr.Markdown("### 🛠 Tools")
 
-started = chat_started()
-inject_app_css(fixed_bottom_composer=started)
+            cb_search = gr.Checkbox(label="🔍 Web Search",  value=True)
+            cb_weather = gr.Checkbox(label="🌤 Weather",     value=True)
+            cb_calc    = gr.Checkbox(label="🧮 Calculator",  value=True)
+            cb_memory  = gr.Checkbox(label="🧠 Memory",      value=True)
+            cb_deep    = gr.Checkbox(label="🔬 Deep Search", value=True)
+            cb_github  = gr.Checkbox(label="🐙 GitHub",      value=False)
 
-if not started:
-    render_welcome_screen()
-else:
-    render_messages()
-    render_tool_badges()
-    render_bottom_composer()
+            github_token = gr.Textbox(
+                label="GitHub Token",
+                placeholder="Paste your token here",
+                type="password",
+                visible=False,
+            )
+
+            cb_search.change(toggle_search,  cb_search,  None)
+            cb_weather.change(toggle_weather, cb_weather, None)
+            cb_calc.change(toggle_calc,    cb_calc,    None)
+            cb_memory.change(toggle_memory,  cb_memory,  None)
+            cb_deep.change(toggle_deep,    cb_deep,    None)
+            cb_github.change(toggle_github,  cb_github,  None)
+            cb_github.change(lambda v: gr.update(visible=v), cb_github, github_token)
+            github_token.change(update_token, github_token, None)
+
+        # ── Chat area ─────────────────────────────────────────────────────────
+        with gr.Column(scale=4):
+            chatbot = gr.Chatbot(
+                elem_id="chatbot",
+                label="",
+                show_label=False,
+                bubble_full_width=False,
+            )
+
+            with gr.Row():
+                msg = gr.Textbox(
+                    placeholder="Message",
+                    show_label=False,
+                    scale=9,
+                    container=False,
+                )
+                send_btn = gr.Button("↑", scale=1, variant="primary")
+
+            clear_btn = gr.Button("🗑 Clear chat", size="sm", variant="secondary")
+
+    # ── Event handlers ────────────────────────────────────────────────────────
+    msg.submit(chat, [msg, chatbot], [chatbot, msg])
+    send_btn.click(chat, [msg, chatbot], [chatbot, msg])
+    clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
+
+
+if __name__ == "__main__":
+    demo.launch()
