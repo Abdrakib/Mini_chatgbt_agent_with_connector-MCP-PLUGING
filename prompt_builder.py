@@ -15,7 +15,9 @@ def build_prompt(message: str, tool_result: str, memory_context: str) -> str:
     if tool_result:
         parts.append(f"Use this information to answer: {tool_result}")
         parts.append(f"Question: {message}")
-        parts.append("Give a short direct answer using only the information above.")
+        parts.append(
+            "Answer using ONLY the information provided above. Do not add, change or interpret any values. Use the exact words from the information."
+        )
     else:
         parts.append(f"Question: {message}")
         parts.append("Give a short direct answer in 1-2 sentences.")
