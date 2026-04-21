@@ -122,12 +122,12 @@ def _is_calc(message: str) -> bool:
 
 
 def _detect_tool(message: str) -> str:
+    if _contains_any(message, _WEATHER_KEYS) or _fuzzy_contains(message, _WEATHER_KEYS, threshold=80):
+        return "weather"
     if _contains_any(message, _MEMORY_KEYS) or _fuzzy_contains(message, _MEMORY_KEYS, threshold=85):
         return "memory"
     if _contains_any(message, _GITHUB_KEYS) or _fuzzy_contains(message, _GITHUB_KEYS, threshold=85):
         return "github"
-    if _contains_any(message, _WEATHER_KEYS) or _fuzzy_contains(message, _WEATHER_KEYS, threshold=80):
-        return "weather"
     if _is_calc(message):
         return "calc"
     if _contains_any(message, _DEEP_SEARCH_KEYS) or _fuzzy_contains(message, _DEEP_SEARCH_KEYS, threshold=85):
