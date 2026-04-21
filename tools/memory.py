@@ -137,7 +137,10 @@ def _wants_save(message: str) -> bool:
 
 
 def _format_facts_line(store: Dict[str, str]) -> str:
-    parts = [f"{k} is {v}" for k, v in store.items()]
+    parts = []
+    for k, v in store.items():
+        key_clean = k.replace("_", " ")
+        parts.append(f"Your {key_clean} is {v}")
     return "Here is what I know about you: " + ", ".join(parts)
 
 
