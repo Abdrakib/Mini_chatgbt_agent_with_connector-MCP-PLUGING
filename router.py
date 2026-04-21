@@ -64,6 +64,22 @@ _MEMORY_KEYS = (
     "what do you know",
     "do you remember",
     "what is my",
+    "my favorite",
+    "i love",
+    "i hate",
+    "i prefer",
+    "i enjoy",
+    "my car is",
+    "my age is",
+    "my job is",
+    "my major is",
+    "i study",
+    "i was born",
+    "my birthday is",
+    "my dog is",
+    "my cat is",
+    "my phone is",
+    "my email is",
 )
 
 _GITHUB_KEYS = (
