@@ -1,6 +1,8 @@
 import re
 from typing import Any, Dict
 
+from thefuzz import fuzz
+
 _WEATHER_KEYS = (
     "weather",
     "temperature",
@@ -78,6 +80,19 @@ def _contains_any(haystack: str, needles: tuple[str, ...]) -> bool:
     return any(n in low for n in needles)
 
 
+def _fuzzy_contains(message: str, keywords: tuple, threshold: int = 80) -> bool:
+    words = message.lower().split()
+    for word in words:
+        for keyword in keywords:
+            if len(keyword.split()) == 1:
+                if fuzz.ratio(word, keyword) >= threshold:
+                    return True
+            else:
+                if fuzz.partial_ratio(message.lower(), keyword) >= threshold:
+                    return True
+    return False
+
+
 def _is_calc(message: str) -> bool:
     """Calculator intent: math keywords, digit+operator patterns, or 'what is' with digits."""
     if _contains_any(message, _CALC_WORD_KEYS):
@@ -91,22 +106,17 @@ def _is_calc(message: str) -> bool:
 
 
 def _detect_tool(message: str) -> str:
-    """
-    First-match routing. Order: memory → github → weather → calc → deep_search → search.
-    Calc is checked before search so expressions like 'what is 5 + 3' prefer calc.
-    Deep search is checked before generic search so 'deep search' does not match only 'search'.
-    """
-    if _contains_any(message, _MEMORY_KEYS):
+    if _contains_any(message, _MEMORY_KEYS) or _fuzzy_contains(message, _MEMORY_KEYS):
         return "memory"
-    if _contains_any(message, _GITHUB_KEYS):
+    if _contains_any(message, _GITHUB_KEYS) or _fuzzy_contains(message, _GITHUB_KEYS):
         return "github"
-    if _contains_any(message, _WEATHER_KEYS):
+    if _contains_any(message, _WEATHER_KEYS) or _fuzzy_contains(message, _WEATHER_KEYS):
         return "weather"
     if _is_calc(message):
         return "calc"
-    if _contains_any(message, _DEEP_SEARCH_KEYS):
+    if _contains_any(message, _DEEP_SEARCH_KEYS) or _fuzzy_contains(message, _DEEP_SEARCH_KEYS):
         return "deep_search"
-    if _contains_any(message, _SEARCH_KEYS):
+    if _contains_any(message, _SEARCH_KEYS) or _fuzzy_contains(message, _SEARCH_KEYS):
         return "search"
     return "none"
 
@@ -143,6 +153,10 @@ if __name__ == "__main__":
         "research quantum computing",
         "deep dive into neural networks",
         "explain in detail how transformers work",
+        "wheather in philadelphia",
+        "wat is the wether today",
+        "serach for AI news",
+        "calcualte 25 times 4",
     )
     for m in _msgs:
         tools = dict(_all_on)

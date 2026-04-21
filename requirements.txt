@@ -6,3 +6,5 @@ accelerate
 ddgs
 requests
 PyGithub
+thefuzz
+python-Levenshtein

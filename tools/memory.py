@@ -18,23 +18,36 @@ _SAVE_TRIGGERS = (
     "i live",
     "i like",
     "i work",
+    "my favorite",
+    "i love",
+    "i hate",
+    "i prefer",
+    "i enjoy",
+    "my car is",
+    "my age is",
+    "my job is",
+    "my major is",
+    "i study",
+    "i was born",
+    "my birthday is",
+    "my dog is",
+    "my cat is",
+    "my phone is",
+    "my email is",
 )
 
 
 def _get_memory_store() -> Dict[str, str]:
-    """Return the dict backing `memory_store` (session state in Streamlit, else module fallback)."""
     if _FORCE_OFFLINE_STORE:
         return _OFFLINE_STORE
     try:
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        import streamlit as st
 
-        if get_script_run_ctx() is not None:
-            import streamlit as st
-
+        if hasattr(st, "session_state"):
             if "memory_store" not in st.session_state:
                 st.session_state.memory_store = {}
             return st.session_state.memory_store
-    except ImportError:
+    except Exception:
         pass
     return _OFFLINE_STORE
 
@@ -47,19 +60,32 @@ def _extract_fact(message: str) -> tuple[str, str] | None:
     """Return (key, value) if a known pattern matches."""
     text = message.strip()
 
-    patterns: tuple[tuple[re.Pattern[str], str], ...] = (
+    patterns: tuple[tuple[re.Pattern[str], str | None], ...] = (
         (re.compile(r"(?i)my\s+name\s+is\s+(.+)"), "name"),
         (re.compile(r"(?i)i\s+live\s+in\s+(.+)"), "city"),
         (re.compile(r"(?i)i\s+like\s+(.+)"), "likes"),
         (re.compile(r"(?i)i\s+work\s+(.+)"), "work"),
         (re.compile(r"(?i)i\s+am\s+(.+)"), "about"),
         (re.compile(r"(?i)remember(?:\s+that)?\s+(.+)"), "remembered"),
+        (re.compile(r"(?i)my\s+favorite\s+(.+?)\s+is\s+(.+)"), None),
+        (re.compile(r"(?i)i\s+love\s+(.+)"), "loves"),
+        (re.compile(r"(?i)i\s+hate\s+(.+)"), "hates"),
+        (re.compile(r"(?i)i\s+enjoy\s+(.+)"), "enjoys"),
+        (re.compile(r"(?i)i\s+prefer\s+(.+)"), "prefers"),
+        (re.compile(r"(?i)my\s+(\w+(?:\s+\w+)?)\s+is\s+(.+)"), None),
     )
     for pat, key in patterns:
         m = pat.search(text)
         if m:
-            val = _strip_trailing_punct(m.group(1))
-            if val:
+            if key is None:
+                if len(m.groups()) == 2:
+                    key = _strip_trailing_punct(m.group(1)).lower().replace(" ", "_")
+                    val = _strip_trailing_punct(m.group(2))
+                else:
+                    continue
+            else:
+                val = _strip_trailing_punct(m.group(1))
+            if key and val:
                 return key, val
 
     low = text.lower()
@@ -71,6 +97,33 @@ def _extract_fact(message: str) -> tuple[str, str] | None:
                 return "location", val
 
     return None
+
+
+def _llm_extract_fact(message: str):
+    try:
+        from model import generate_response
+
+        prompt = (
+            f"Extract a personal fact from this sentence as a key:value pair.\n"
+            f"Rules:\n"
+            f"- Reply with ONLY 'key: value' nothing else\n"
+            f"- key should be a single word like 'car', 'food', 'name', 'city'\n"
+            f"- value should be what was stated\n"
+            f"- If no personal fact exists reply with 'none'\n"
+            f"Sentence: {message}\n"
+            f"Answer:"
+        )
+        result = generate_response(prompt).strip()
+        if result.lower() == "none" or ":" not in result:
+            return None
+        parts = result.split(":", 1)
+        key = parts[0].strip().lower()
+        value = parts[1].strip()
+        if key and value:
+            return key, value
+        return None
+    except Exception:
+        return None
 
 
 def _wants_recall(message: str) -> bool:
@@ -98,6 +151,8 @@ def run_memory(message: str) -> str:
 
     if _wants_save(message):
         fact = _extract_fact(message)
+        if not fact:
+            fact = _llm_extract_fact(message)
         if fact:
             key, value = fact
             store[key] = value
