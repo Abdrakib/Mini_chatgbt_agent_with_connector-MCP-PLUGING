@@ -1,3 +1,5 @@
+_memory_store = {}
+
 import copy
 import uuid
 
@@ -12,6 +14,16 @@ from tools.github import run_github
 from tools.memory import get_memory_context, run_memory
 from tools.search import run_search
 from tools.weather import run_weather
+
+import tools.memory as _mem_module
+
+_mem_module._FORCE_OFFLINE_STORE = True
+_mem_module._OFFLINE_STORE = _memory_store
+
+
+def _get_app_memory():
+    return _memory_store
+
 
 # ── Tool state ────────────────────────────────────────────────────────────────
 _tool_state = {
