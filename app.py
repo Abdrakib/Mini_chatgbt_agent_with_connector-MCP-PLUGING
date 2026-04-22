@@ -143,10 +143,17 @@ footer { display: none !important; }
     margin-bottom: 12px;
 }
 
+#main-col {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+}
+
 #chatbot {
     background: #FFFEF8 !important;
     border: none !important;
     flex: 1 !important;
+    overflow-y: auto !important;
 }
 
 #chatbot .wrap {
@@ -300,11 +307,11 @@ WELCOME_HTML = """
 </div>
 """
 
-with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
+with gr.Blocks(title="Mini ChatGPT Agent", css=CSS, fill_height=True) as demo:
 
     archive_state = gr.State([])
 
-    with gr.Row():
+    with gr.Row(equal_height=True):
 
         with gr.Column(scale=1, min_width=220, elem_classes=["sidebar-col"]):
             gr.HTML('<div class="app-title">🤖 Mini ChatGPT Agent</div>')
@@ -330,7 +337,7 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                         None, chatbot
                     )
 
-        with gr.Column(scale=5):
+        with gr.Column(scale=5, elem_id="main-col"):
 
             chatbot = gr.Chatbot(
                 elem_id="chatbot",
