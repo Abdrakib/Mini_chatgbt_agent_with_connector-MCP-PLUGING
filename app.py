@@ -265,13 +265,31 @@ footer { display: none !important; }
     color: #4A3200 !important;
 }
 
-/* Clear button */
+/* Make Tools accordion tiny and inline */
+.gr-accordion > .label-wrap {
+    background: #FEF9E7 !important;
+    border: 1.5px solid #F0DDA0 !important;
+    border-radius: 10px !important;
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+    color: #D97706 !important;
+    font-weight: 600 !important;
+}
+
+/* Clear chat button smaller and subtle */
+.clear-btn {
+    display: flex !important;
+    justify-content: center !important;
+}
+
 .clear-btn button {
+    max-width: 120px !important;
+    font-size: 0.75rem !important;
+    padding: 4px 12px !important;
+    border-radius: 20px !important;
     background: transparent !important;
     border: 1px solid #F0DDA0 !important;
     color: #B8922A !important;
-    border-radius: 8px !important;
-    font-size: 0.78rem !important;
     transition: all 0.2s !important;
 }
 
