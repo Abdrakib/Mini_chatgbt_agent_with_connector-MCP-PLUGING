@@ -94,6 +94,12 @@ def chat(user_message, history):
     elif tool_name == "memory":      tool_result = run_memory(user_message)
     elif tool_name == "github":      tool_result = run_github(user_message, _github_token["value"])
 
+    if tool_name == 'memory' and tool_result == 'Got it! I will remember that':
+        reply = 'Got it! I will remember that.' + '\n\n*Tool used: 🧠 Memory*'
+        history = list(history or [])
+        history.append((user_message, reply))
+        return history, ''
+
     if tool_name == 'memory' and tool_result.startswith('Here is what I know'):
         reply = tool_result + '\n\n*Tool used: 🧠 Memory*'
         history = list(history or [])

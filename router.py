@@ -57,7 +57,6 @@ _CALC_WORD_KEYS = (
 _MEMORY_KEYS = (
     "remember",
     "my name is",
-    "i am",
     "i live",
     "i like",
     "i work",
@@ -129,7 +128,7 @@ def _is_calc(message: str) -> bool:
 def _detect_tool(message: str) -> str:
     if _contains_any(message, _WEATHER_KEYS) or _fuzzy_contains(message, _WEATHER_KEYS, threshold=80):
         return "weather"
-    if _contains_any(message, _MEMORY_KEYS) or _fuzzy_contains(message, _MEMORY_KEYS, threshold=85):
+    if _contains_any(message, _MEMORY_KEYS) or _fuzzy_contains(message, _MEMORY_KEYS, threshold=90):
         return "memory"
     if _contains_any(message, _GITHUB_KEYS) or _fuzzy_contains(message, _GITHUB_KEYS, threshold=85):
         return "github"
