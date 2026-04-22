@@ -2,7 +2,6 @@ _memory_store = {}
 
 import copy
 import uuid
-
 import gradio as gr
 
 from model import generate_response
@@ -16,16 +15,9 @@ from tools.search import run_search
 from tools.weather import run_weather
 
 import tools.memory as _mem_module
-
 _mem_module._FORCE_OFFLINE_STORE = True
 _mem_module._OFFLINE_STORE = _memory_store
 
-
-def _get_app_memory():
-    return _memory_store
-
-
-# ── Tool state ────────────────────────────────────────────────────────────────
 _tool_state = {
     "search": True,
     "weather": True,
@@ -37,14 +29,13 @@ _tool_state = {
 _github_token = {"value": ""}
 
 _BADGE_META = [
-    ("search",      "🔍", "Web Search",  "#E3F2FD", "#1565C0"),
-    ("weather",     "🌤", "Weather",     "#FFF3E0", "#E65100"),
-    ("calc",        "🧮", "Calculator",  "#E8F5E9", "#2E7D32"),
-    ("memory",      "🧠", "Memory",      "#F3E5F5", "#6A1B9A"),
-    ("deep_search", "🔬", "Deep Search", "#E0F7FA", "#006064"),
-    ("github",      "🐙", "GitHub",      "#EDE7F6", "#4527A0"),
+    ("search",      "🔍", "Web Search",  "#FEF9E7", "#B45309"),
+    ("weather",     "🌤", "Weather",     "#F0FDF4", "#15803D"),
+    ("calc",        "🧮", "Calculator",  "#FFF7ED", "#C2410C"),
+    ("memory",      "🧠", "Memory",      "#FAF5FF", "#7E22CE"),
+    ("deep_search", "🔬", "Deep Search", "#F0FDFA", "#0F766E"),
+    ("github",      "🐙", "GitHub",      "#FFF1F2", "#BE123C"),
 ]
-
 
 def _badges_html() -> str:
     parts = []
@@ -52,25 +43,24 @@ def _badges_html() -> str:
         if _tool_state.get(key):
             parts.append(
                 f'<span style="display:inline-block;background:{bg};color:{fg};'
-                f'font-size:0.78rem;font-weight:600;padding:3px 10px;'
-                f'border-radius:999px;margin:0 4px 4px 0">{emoji} {name}</span>'
+                f'font-size:0.72rem;font-weight:600;padding:4px 12px;'
+                f'border-radius:999px;margin:0 4px 4px 0;'
+                f'border:1px solid {fg}33">{emoji} {name}</span>'
             )
     if not parts:
         return ""
     return (
-        '<div style="display:flex;flex-wrap:wrap;padding:6px 0 2px 0">'
+        '<div style="display:flex;flex-wrap:wrap;padding:8px 0 4px 0">'
         + "".join(parts) + "</div>"
     )
 
-
 def _title_from(hist):
     if not hist:
-        return "Empty chat"
+        return "New chat"
     first = hist[0]
     text = first[0] if isinstance(first, (list, tuple)) else (first.get("content") or "")
     text = str(text).strip().replace("\n", " ")
-    return (text[:48] + "…") if len(text) > 48 else (text or "Empty chat")
-
+    return (text[:45] + "…") if len(text) > 45 else (text or "New chat")
 
 def chat(user_message, history):
     if not (user_message or "").strip():
@@ -94,17 +84,17 @@ def chat(user_message, history):
     elif tool_name == "memory":      tool_result = run_memory(user_message)
     elif tool_name == "github":      tool_result = run_github(user_message, _github_token["value"])
 
-    if tool_name == 'memory' and tool_result == 'Got it! I will remember that':
-        reply = 'Got it! I will remember that.' + '\n\n*Tool used: 🧠 Memory*'
+    if tool_name == "memory" and tool_result == "Got it! I will remember that":
+        reply = "✅ Got it! I will remember that.\n\n*Tool used: 🧠 Memory*"
         history = list(history or [])
         history.append((user_message, reply))
-        return history, ''
+        return history, ""
 
-    if tool_name == 'memory' and tool_result.startswith('Here is what I know'):
-        reply = tool_result + '\n\n*Tool used: 🧠 Memory*'
+    if tool_name == "memory" and tool_result.startswith("Here is what I know"):
+        reply = tool_result + "\n\n*Tool used: 🧠 Memory*"
         history = list(history or [])
         history.append((user_message, reply))
-        return history, ''
+        return history, ""
 
     full_prompt = build_prompt(user_message, tool_result, get_memory_context())
 
@@ -127,7 +117,6 @@ def chat(user_message, history):
     history.append((user_message, reply))
     return history, ""
 
-
 def new_chat(current_hist, archives):
     arch = list(archives or [])
     if current_hist:
@@ -138,61 +127,236 @@ def new_chat(current_hist, archives):
         })
     return [], arch
 
-
 CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+* { box-sizing: border-box; }
+
+body, .gradio-container {
+    background: #FFFEF8 !important;
+    color: #4A3200 !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
 footer { display: none !important; }
-#send-btn {
-    min-width: 42px !important;
-    max-width: 42px !important;
-    height: 42px !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-    font-size: 1.1rem !important;
-    background: #2563eb !important;
-    color: white !important;
+.gradio-container { max-width: 100% !important; padding: 0 !important; }
+
+/* Sidebar */
+.sidebar-col {
+    background: #FFFBF0 !important;
+    border-right: 1.5px solid #F0DDA0 !important;
+    min-height: 100vh;
+    padding: 20px 12px !important;
+}
+
+.app-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #4A3200;
+    padding: 6px 6px 14px 6px;
+    border-bottom: 1px solid #F0DDA0;
+    margin-bottom: 12px;
+}
+
+/* Chatbot */
+#chatbot {
+    background: #FFFEF8 !important;
     border: none !important;
 }
-#send-btn:hover { background: #1d4ed8 !important; }
-#msg-input textarea { border-radius: 20px !important; padding: 10px 16px !important; }
+
+#chatbot .message {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.93rem !important;
+    line-height: 1.7 !important;
+}
+
+#chatbot .user {
+    background: #D97706 !important;
+    color: #ffffff !important;
+    border-radius: 18px 18px 3px 18px !important;
+    padding: 12px 16px !important;
+    max-width: 72% !important;
+    margin-left: auto !important;
+    border: none !important;
+}
+
+#chatbot .bot {
+    background: #FEF9E7 !important;
+    color: #4A3200 !important;
+    border-radius: 18px 18px 18px 3px !important;
+    padding: 12px 16px !important;
+    max-width: 82% !important;
+    border: 1px solid #F0DDA0 !important;
+}
+
+/* Input bar */
+#msg-input textarea {
+    background: #ffffff !important;
+    border: 1.5px solid #F0DDA0 !important;
+    border-radius: 12px !important;
+    color: #4A3200 !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.93rem !important;
+    padding: 13px 16px !important;
+    transition: border-color 0.2s !important;
+}
+
+#msg-input textarea:focus {
+    border-color: #D97706 !important;
+    box-shadow: 0 0 0 3px #D9770618 !important;
+    outline: none !important;
+}
+
+#msg-input textarea::placeholder { color: #B8922A !important; }
+
+/* Send button */
+#send-btn {
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    border-radius: 10px !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+    background: #D97706 !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 2px 8px #D9770633 !important;
+    transition: all 0.2s !important;
+}
+
+#send-btn:hover {
+    background: #B45309 !important;
+    transform: scale(1.04) !important;
+}
+
+/* New chat button */
+.new-chat-btn button {
+    background: #FEF9E7 !important;
+    border: 1.5px solid #F0DDA0 !important;
+    color: #4A3200 !important;
+    border-radius: 10px !important;
+    font-size: 0.83rem !important;
+    font-weight: 500 !important;
+    transition: all 0.15s !important;
+    width: 100% !important;
+}
+
+.new-chat-btn button:hover {
+    background: #F0DDA0 !important;
+    border-color: #D97706 !important;
+    color: #4A3200 !important;
+}
+
+/* History buttons */
+.history-btn button {
+    background: transparent !important;
+    border: none !important;
+    color: #8A6A1A !important;
+    text-align: left !important;
+    font-size: 0.81rem !important;
+    padding: 7px 8px !important;
+    border-radius: 8px !important;
+    transition: all 0.15s !important;
+    width: 100% !important;
+}
+
+.history-btn button:hover {
+    background: #F0DDA055 !important;
+    color: #4A3200 !important;
+}
+
+/* Clear button */
+.clear-btn button {
+    background: transparent !important;
+    border: 1px solid #F0DDA0 !important;
+    color: #B8922A !important;
+    border-radius: 8px !important;
+    font-size: 0.78rem !important;
+    transition: all 0.2s !important;
+}
+
+.clear-btn button:hover {
+    border-color: #D97706 !important;
+    color: #D97706 !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #FFFBF0; }
+::-webkit-scrollbar-thumb { background: #F0DDA0; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #D97706; }
 """
 
-with gr.Blocks(title="Mini ChatGPT Agent", theme=gr.themes.Soft(), css=CSS) as demo:
+WELCOME_HTML = """
+<div style="display:flex;flex-direction:column;align-items:center;
+            justify-content:center;padding:80px 20px;text-align:center">
+    <div style="font-size:2.8rem;margin-bottom:14px">🤖</div>
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;
+               font-size:1.5rem;color:#4A3200;margin:0 0 6px 0;
+               letter-spacing:-0.02em">
+        Mini ChatGPT Agent
+    </h2>
+    <p style="font-family:'Plus Jakarta Sans',sans-serif;color:#B8922A;
+              font-size:0.87rem;margin:0 0 28px 0">
+        Powered by Qwen2.5 · 6 intelligent tools
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:480px">
+        <span style="background:#FEF9E7;color:#B45309;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #F0DDA0">🔍 Web Search</span>
+        <span style="background:#F0FDF4;color:#15803D;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #BBF7D0">🌤 Weather</span>
+        <span style="background:#FFF7ED;color:#C2410C;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #FED7AA">🧮 Calculator</span>
+        <span style="background:#FAF5FF;color:#7E22CE;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #E9D5FF">🧠 Memory</span>
+        <span style="background:#F0FDFA;color:#0F766E;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #99F6E4">🔬 Deep Search</span>
+        <span style="background:#FFF1F2;color:#BE123C;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #FECDD3">🐙 GitHub</span>
+    </div>
+</div>
+"""
+
+with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
 
     archive_state = gr.State([])
 
     with gr.Row():
-        with gr.Column(scale=1, min_width=180):
-            gr.Markdown("##### 🤖 Mini ChatGPT Agent")
-            new_chat_btn = gr.Button("➕ New chat", size="sm")
-            gr.Markdown("**Chats**")
+
+        with gr.Column(scale=1, min_width=220, elem_classes=["sidebar-col"]):
+            gr.HTML('<div class="app-title">🤖 Mini ChatGPT Agent</div>')
+
+            new_chat_btn = gr.Button(
+                "＋  New chat",
+                elem_classes=["new-chat-btn"],
+                size="sm"
+            )
+
+            gr.HTML('<div style="color:#B8922A;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;padding:14px 6px 6px 6px">Recent</div>')
 
             @gr.render(inputs=[archive_state])
             def render_history(archives):
                 for conv in (archives or []):
                     b = gr.Button(
-                        (conv.get("title") or "Untitled")[:60],
+                        "💬  " + (conv.get("title") or "Untitled")[:36],
+                        elem_classes=["history-btn"],
                         size="sm",
-                        variant="secondary",
                     )
                     b.click(
                         lambda c=conv: c.get("messages") or [],
                         None, chatbot
                     )
 
-        with gr.Column(scale=4):
+        with gr.Column(scale=5):
 
             chatbot = gr.Chatbot(
+                elem_id="chatbot",
                 label="",
                 show_label=False,
-                height=480,
+                height=530,
                 bubble_full_width=False,
+                placeholder=WELCOME_HTML,
             )
 
             badges = gr.HTML(value=_badges_html())
 
             with gr.Row(equal_height=True):
-                with gr.Column(scale=1, min_width=120):
-                    with gr.Accordion("➕ Tools", open=False):
+                with gr.Column(scale=1, min_width=110):
+                    with gr.Accordion("⚡ Tools", open=False):
                         cb_search  = gr.Checkbox(label="🔍 Web Search",  value=True)
                         cb_weather = gr.Checkbox(label="🌤 Weather",      value=True)
                         cb_calc    = gr.Checkbox(label="🧮 Calculator",   value=True)
@@ -203,10 +367,11 @@ with gr.Blocks(title="Mini ChatGPT Agent", theme=gr.themes.Soft(), css=CSS) as d
                             label="GitHub Token",
                             type="password",
                             visible=False,
+                            placeholder="ghp_xxxxxxxxxxxx",
                         )
 
                 msg = gr.Textbox(
-                    placeholder="Message",
+                    placeholder="Message Mini ChatGPT Agent...",
                     show_label=False,
                     scale=9,
                     container=False,
@@ -214,7 +379,13 @@ with gr.Blocks(title="Mini ChatGPT Agent", theme=gr.themes.Soft(), css=CSS) as d
                 )
                 send = gr.Button("↑", elem_id="send-btn", scale=1)
 
-            clear = gr.Button("🗑 Clear chat", size="sm", variant="secondary")
+            with gr.Row():
+                clear = gr.Button(
+                    "🗑  Clear chat",
+                    size="sm",
+                    variant="secondary",
+                    elem_classes=["clear-btn"]
+                )
 
     def _toggle(key, val):
         _tool_state[key] = val
@@ -236,7 +407,6 @@ with gr.Blocks(title="Mini ChatGPT Agent", theme=gr.themes.Soft(), css=CSS) as d
     msg.submit(chat, [msg, chatbot], [chatbot, msg])
     send.click(chat,  [msg, chatbot], [chatbot, msg])
     clear.click(lambda: ([], ""), None, [chatbot, msg])
-
 
 if __name__ == "__main__":
     demo.launch()
