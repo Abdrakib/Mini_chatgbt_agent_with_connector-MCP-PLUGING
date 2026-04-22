@@ -336,7 +336,7 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                 elem_id="chatbot",
                 label="",
                 show_label=False,
-                height="60vh",
+                height="75vh",
                 bubble_full_width=False,
                 placeholder=WELCOME_HTML,
                 type="messages",
