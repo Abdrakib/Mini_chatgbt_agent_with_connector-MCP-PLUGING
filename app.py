@@ -32,8 +32,11 @@ def _title_from(hist):
     if not hist:
         return "New chat"
     first = hist[0]
-    text = first[0] if isinstance(first, (list, tuple)) else (first.get("content") or "")
-    text = str(text).strip().replace("\n", " ")
+    if isinstance(first, dict):
+        text = str(first.get("content") or "").strip().replace("\n", " ")
+    else:
+        text = first[0] if isinstance(first, (list, tuple)) else (first.get("content") or "")
+        text = str(text).strip().replace("\n", " ")
     return (text[:45] + "…") if len(text) > 45 else (text or "New chat")
 
 def chat(user_message, history):
@@ -61,13 +64,15 @@ def chat(user_message, history):
     if tool_name == "memory" and tool_result == "Got it! I will remember that":
         reply = "✅ Got it! I will remember that.\n\n*Tool used: 🧠 Memory*"
         history = list(history or [])
-        history.append((user_message, reply))
+        history.append({"role": "user", "content": user_message})
+        history.append({"role": "assistant", "content": reply})
         return history, ""
 
     if tool_name == "memory" and tool_result.startswith("Here is what I know"):
         reply = tool_result + "\n\n*Tool used: 🧠 Memory*"
         history = list(history or [])
-        history.append((user_message, reply))
+        history.append({"role": "user", "content": user_message})
+        history.append({"role": "assistant", "content": reply})
         return history, ""
 
     full_prompt = build_prompt(user_message, tool_result, get_memory_context())
@@ -88,7 +93,8 @@ def chat(user_message, history):
     reply += f"\n\n*Tool used: {labels.get(tool_name, 'No tool')}*"
 
     history = list(history or [])
-    history.append((user_message, reply))
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "assistant", "content": reply})
     return history, ""
 
 def new_chat(current_hist, archives):
@@ -260,6 +266,14 @@ footer { display: none !important; }
 ::-webkit-scrollbar-track { background: #FFFBF0; }
 ::-webkit-scrollbar-thumb { background: #F0DDA0; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #D97706; }
+
+.gradio-container > .main > .wrap > .padding {
+    padding-bottom: 0 !important;
+}
+div.svelte-1gfkn6j {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+}
 """
 
 WELCOME_HTML = """
@@ -315,6 +329,7 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                 height=480,
                 bubble_full_width=False,
                 placeholder=WELCOME_HTML,
+                type="messages",
             )
 
             with gr.Row(equal_height=True):
