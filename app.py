@@ -114,8 +114,15 @@ body, .gradio-container {
 }
 
 footer { display: none !important; }
-.gradio-container { max-width: 100% !important; padding: 0 !important; }
-.gradio-container { padding-bottom: 0 !important; }
+.block-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+}
+.gradio-container {
+    min-height: unset !important;
+    padding-bottom: 0 !important;
+}
 .gap { gap: 0 !important; }
 
 /* Sidebar */
@@ -164,6 +171,13 @@ footer { display: none !important; }
     padding: 12px 16px !important;
     max-width: 82% !important;
     border: 1px solid #F0DDA0 !important;
+}
+
+#chatbot .user, #chatbot .bot {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    width: auto !important;
+    min-width: 60px !important;
 }
 
 /* Input bar */
@@ -262,17 +276,11 @@ footer { display: none !important; }
 """
 
 WELCOME_HTML = """
-<div style="display:flex;flex-direction:column;align-items:center;
-            justify-content:center;height:400px;text-align:center">
-    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;
-               font-size:1.8rem;color:#4A3200;margin:0 0 8px 0;
-               letter-spacing:-0.02em">
+<div style='text-align:center;padding:120px 20px 40px 20px'>
+    <h2 style='font-size:1.6rem;font-weight:600;color:#4A3200;
+               margin:0 0 6px 0;font-family:"Plus Jakarta Sans",sans-serif'>
         Welcome to Mini ChatGPT Agent
     </h2>
-    <p style="font-family:'Plus Jakarta Sans',sans-serif;color:#B8922A;
-              font-size:0.9rem;margin:0">
-        Powered by Qwen2.5 · Ask me anything
-    </p>
 </div>
 """
 
