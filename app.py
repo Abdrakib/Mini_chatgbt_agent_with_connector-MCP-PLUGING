@@ -28,7 +28,6 @@ _tool_state = {
 }
 _github_token = {"value": ""}
 
-
 def _title_from(hist):
     if not hist:
         return "New chat"
@@ -114,16 +113,12 @@ body, .gradio-container {
 }
 
 footer { display: none !important; }
+
 .block-container {
-    padding: 0 !important;
-    margin: 0 !important;
+    padding: 8px !important;
+    margin: 0 auto !important;
     max-width: 100% !important;
 }
-.gradio-container {
-    min-height: unset !important;
-    padding-bottom: 0 !important;
-}
-.gap { gap: 0 !important; }
 
 /* Sidebar */
 .sidebar-col {
@@ -142,47 +137,52 @@ footer { display: none !important; }
     margin-bottom: 12px;
 }
 
-/* Chatbot */
+/* Fix user bubble going vertical */
+#chatbot .message-wrap .message {
+    display: block !important;
+    width: fit-content !important;
+    max-width: 72% !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+}
+
 #chatbot {
     background: #FFFEF8 !important;
     border: none !important;
+    flex: 1 !important;
 }
 
-#chatbot .message {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 0.93rem !important;
-    line-height: 1.7 !important;
+#chatbot .wrap {
+    min-height: 200px !important;
 }
 
-#chatbot .user {
+/* User bubble */
+#chatbot .message-wrap .user {
     background: #D97706 !important;
     color: #ffffff !important;
     border-radius: 18px 18px 3px 18px !important;
-    padding: 12px 16px !important;
-    max-width: 72% !important;
+    padding: 10px 14px !important;
     margin-left: auto !important;
     border: none !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.93rem !important;
+    line-height: 1.6 !important;
 }
 
-#chatbot .bot {
+/* Bot bubble */
+#chatbot .message-wrap .bot {
     background: #FEF9E7 !important;
     color: #4A3200 !important;
     border-radius: 18px 18px 18px 3px !important;
-    padding: 12px 16px !important;
-    max-width: 82% !important;
+    padding: 10px 14px !important;
     border: 1px solid #F0DDA0 !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.93rem !important;
+    line-height: 1.6 !important;
 }
 
-#chatbot .user, #chatbot .bot {
-    white-space: normal !important;
-    word-wrap: break-word !important;
-    width: auto !important;
-    min-width: 60px !important;
-}
-
-/* Input bar */
+/* Input */
 #msg-input textarea {
-    margin-top: 16px !important;
     background: #ffffff !important;
     border: 1.5px solid #F0DDA0 !important;
     border-radius: 12px !important;
@@ -212,7 +212,6 @@ footer { display: none !important; }
     background: #D97706 !important;
     color: white !important;
     border: none !important;
-    box-shadow: 0 2px 8px #D9770633 !important;
     transition: all 0.2s !important;
 }
 
@@ -236,7 +235,6 @@ footer { display: none !important; }
 .new-chat-btn button:hover {
     background: #F0DDA0 !important;
     border-color: #D97706 !important;
-    color: #4A3200 !important;
 }
 
 /* History buttons */
@@ -257,17 +255,6 @@ footer { display: none !important; }
     color: #4A3200 !important;
 }
 
-/* Make Tools accordion tiny and inline */
-.gr-accordion > .label-wrap {
-    background: #FEF9E7 !important;
-    border: 1.5px solid #F0DDA0 !important;
-    border-radius: 10px !important;
-    padding: 6px 12px !important;
-    font-size: 0.8rem !important;
-    color: #D97706 !important;
-    font-weight: 600 !important;
-}
-
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #FFFBF0; }
@@ -276,11 +263,16 @@ footer { display: none !important; }
 """
 
 WELCOME_HTML = """
-<div style='text-align:center;padding:120px 20px 40px 20px'>
+<div style='text-align:center;padding:100px 20px 20px 20px'>
     <h2 style='font-size:1.6rem;font-weight:600;color:#4A3200;
-               margin:0 0 6px 0;font-family:"Plus Jakarta Sans",sans-serif'>
+               margin:0 0 6px 0;font-family:"Plus Jakarta Sans",sans-serif;
+               letter-spacing:-0.02em'>
         Welcome to Mini ChatGPT Agent
     </h2>
+    <p style='color:#B8922A;font-size:0.88rem;margin:0;
+              font-family:"Plus Jakarta Sans",sans-serif'>
+        Ask me anything
+    </p>
 </div>
 """
 
@@ -320,7 +312,7 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                 elem_id="chatbot",
                 label="",
                 show_label=False,
-                height=530,
+                height=480,
                 bubble_full_width=False,
                 placeholder=WELCOME_HTML,
             )
@@ -357,17 +349,17 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
         _tool_state["github"] = val
         return gr.update(visible=val)
 
-    cb_search.change(lambda v: _toggle("search", v),      cb_search,  None)
-    cb_weather.change(lambda v: _toggle("weather", v),    cb_weather, None)
-    cb_calc.change(lambda v: _toggle("calc", v),          cb_calc,    None)
-    cb_memory.change(lambda v: _toggle("memory", v),      cb_memory,  None)
-    cb_deep.change(lambda v: _toggle("deep_search", v),   cb_deep,    None)
+    cb_search.change(lambda v: _toggle("search", v),    cb_search,  None)
+    cb_weather.change(lambda v: _toggle("weather", v),  cb_weather, None)
+    cb_calc.change(lambda v: _toggle("calc", v),        cb_calc,    None)
+    cb_memory.change(lambda v: _toggle("memory", v),    cb_memory,  None)
+    cb_deep.change(lambda v: _toggle("deep_search", v), cb_deep,    None)
     cb_github.change(_toggle_github, cb_github, gh_token)
     gh_token.change(lambda v: _github_token.update({"value": v}), gh_token, None)
 
     new_chat_btn.click(new_chat, [chatbot, archive_state], [chatbot, archive_state])
     msg.submit(chat, [msg, chatbot], [chatbot, msg])
-    send.click(chat,  [msg, chatbot], [chatbot, msg])
+    send.click(chat, [msg, chatbot], [chatbot, msg])
 
 if __name__ == "__main__":
     demo.launch()
