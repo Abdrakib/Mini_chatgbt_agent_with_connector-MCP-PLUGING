@@ -153,6 +153,13 @@ footer { display: none !important; }
     min-height: 200px !important;
 }
 
+#chatbot .bubble-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    min-height: 100% !important;
+}
+
 /* User bubble */
 #chatbot .message-wrap .user {
     background: #D97706 !important;
@@ -329,7 +336,7 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                 elem_id="chatbot",
                 label="",
                 show_label=False,
-                height=480,
+                height="60vh",
                 bubble_full_width=False,
                 placeholder=WELCOME_HTML,
                 type="messages",
