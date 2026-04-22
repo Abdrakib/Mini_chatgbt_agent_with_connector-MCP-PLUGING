@@ -28,31 +28,6 @@ _tool_state = {
 }
 _github_token = {"value": ""}
 
-_BADGE_META = [
-    ("search",      "🔍", "Web Search",  "#FEF9E7", "#B45309"),
-    ("weather",     "🌤", "Weather",     "#F0FDF4", "#15803D"),
-    ("calc",        "🧮", "Calculator",  "#FFF7ED", "#C2410C"),
-    ("memory",      "🧠", "Memory",      "#FAF5FF", "#7E22CE"),
-    ("deep_search", "🔬", "Deep Search", "#F0FDFA", "#0F766E"),
-    ("github",      "🐙", "GitHub",      "#FFF1F2", "#BE123C"),
-]
-
-def _badges_html() -> str:
-    parts = []
-    for key, emoji, name, bg, fg in _BADGE_META:
-        if _tool_state.get(key):
-            parts.append(
-                f'<span style="display:inline-block;background:{bg};color:{fg};'
-                f'font-size:0.72rem;font-weight:600;padding:4px 12px;'
-                f'border-radius:999px;margin:0 4px 4px 0;'
-                f'border:1px solid {fg}33">{emoji} {name}</span>'
-            )
-    if not parts:
-        return ""
-    return (
-        '<div style="display:flex;flex-wrap:wrap;padding:8px 0 4px 0">'
-        + "".join(parts) + "</div>"
-    )
 
 def _title_from(hist):
     if not hist:
@@ -140,6 +115,8 @@ body, .gradio-container {
 
 footer { display: none !important; }
 .gradio-container { max-width: 100% !important; padding: 0 !important; }
+.gradio-container { padding-bottom: 0 !important; }
+.gap { gap: 0 !important; }
 
 /* Sidebar */
 .sidebar-col {
@@ -286,25 +263,16 @@ footer { display: none !important; }
 
 WELCOME_HTML = """
 <div style="display:flex;flex-direction:column;align-items:center;
-            justify-content:center;padding:80px 20px;text-align:center">
-    <div style="font-size:2.8rem;margin-bottom:14px">🤖</div>
+            justify-content:center;height:400px;text-align:center">
     <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;
-               font-size:1.5rem;color:#4A3200;margin:0 0 6px 0;
+               font-size:1.8rem;color:#4A3200;margin:0 0 8px 0;
                letter-spacing:-0.02em">
-        Mini ChatGPT Agent
+        Welcome to Mini ChatGPT Agent
     </h2>
     <p style="font-family:'Plus Jakarta Sans',sans-serif;color:#B8922A;
-              font-size:0.87rem;margin:0 0 28px 0">
-        Powered by Qwen2.5 · 6 intelligent tools
+              font-size:0.9rem;margin:0">
+        Powered by Qwen2.5 · Ask me anything
     </p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:480px">
-        <span style="background:#FEF9E7;color:#B45309;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #F0DDA0">🔍 Web Search</span>
-        <span style="background:#F0FDF4;color:#15803D;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #BBF7D0">🌤 Weather</span>
-        <span style="background:#FFF7ED;color:#C2410C;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #FED7AA">🧮 Calculator</span>
-        <span style="background:#FAF5FF;color:#7E22CE;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #E9D5FF">🧠 Memory</span>
-        <span style="background:#F0FDFA;color:#0F766E;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #99F6E4">🔬 Deep Search</span>
-        <span style="background:#FFF1F2;color:#BE123C;padding:5px 13px;border-radius:999px;font-size:0.76rem;font-weight:500;border:1px solid #FECDD3">🐙 GitHub</span>
-    </div>
 </div>
 """
 
@@ -349,8 +317,6 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                 placeholder=WELCOME_HTML,
             )
 
-            badges = gr.HTML(value=_badges_html())
-
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=110):
                     with gr.Accordion("⚡ Tools", open=False):
@@ -378,18 +344,17 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
 
     def _toggle(key, val):
         _tool_state[key] = val
-        return gr.update(value=_badges_html())
 
     def _toggle_github(val):
         _tool_state["github"] = val
-        return gr.update(visible=val), gr.update(value=_badges_html())
+        return gr.update(visible=val)
 
-    cb_search.change(lambda v: _toggle("search", v),      cb_search,  badges)
-    cb_weather.change(lambda v: _toggle("weather", v),    cb_weather, badges)
-    cb_calc.change(lambda v: _toggle("calc", v),          cb_calc,    badges)
-    cb_memory.change(lambda v: _toggle("memory", v),      cb_memory,  badges)
-    cb_deep.change(lambda v: _toggle("deep_search", v),   cb_deep,    badges)
-    cb_github.change(_toggle_github, cb_github, [gh_token, badges])
+    cb_search.change(lambda v: _toggle("search", v),      cb_search,  None)
+    cb_weather.change(lambda v: _toggle("weather", v),    cb_weather, None)
+    cb_calc.change(lambda v: _toggle("calc", v),          cb_calc,    None)
+    cb_memory.change(lambda v: _toggle("memory", v),      cb_memory,  None)
+    cb_deep.change(lambda v: _toggle("deep_search", v),   cb_deep,    None)
+    cb_github.change(_toggle_github, cb_github, gh_token)
     gh_token.change(lambda v: _github_token.update({"value": v}), gh_token, None)
 
     new_chat_btn.click(new_chat, [chatbot, archive_state], [chatbot, archive_state])
