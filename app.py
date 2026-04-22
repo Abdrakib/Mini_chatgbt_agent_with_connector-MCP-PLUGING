@@ -191,6 +191,7 @@ footer { display: none !important; }
 
 /* Input bar */
 #msg-input textarea {
+    margin-top: 16px !important;
     background: #ffffff !important;
     border: 1.5px solid #F0DDA0 !important;
     border-radius: 12px !important;
@@ -274,28 +275,6 @@ footer { display: none !important; }
     font-size: 0.8rem !important;
     color: #D97706 !important;
     font-weight: 600 !important;
-}
-
-/* Clear chat button smaller and subtle */
-.clear-btn {
-    display: flex !important;
-    justify-content: center !important;
-}
-
-.clear-btn button {
-    max-width: 120px !important;
-    font-size: 0.75rem !important;
-    padding: 4px 12px !important;
-    border-radius: 20px !important;
-    background: transparent !important;
-    border: 1px solid #F0DDA0 !important;
-    color: #B8922A !important;
-    transition: all 0.2s !important;
-}
-
-.clear-btn button:hover {
-    border-color: #D97706 !important;
-    color: #D97706 !important;
 }
 
 /* Scrollbar */
@@ -397,14 +376,6 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
                 )
                 send = gr.Button("↑", elem_id="send-btn", scale=1)
 
-            with gr.Row():
-                clear = gr.Button(
-                    "🗑  Clear chat",
-                    size="sm",
-                    variant="secondary",
-                    elem_classes=["clear-btn"]
-                )
-
     def _toggle(key, val):
         _tool_state[key] = val
         return gr.update(value=_badges_html())
@@ -424,7 +395,6 @@ with gr.Blocks(title="Mini ChatGPT Agent", css=CSS) as demo:
     new_chat_btn.click(new_chat, [chatbot, archive_state], [chatbot, archive_state])
     msg.submit(chat, [msg, chatbot], [chatbot, msg])
     send.click(chat,  [msg, chatbot], [chatbot, msg])
-    clear.click(lambda: ([], ""), None, [chatbot, msg])
 
 if __name__ == "__main__":
     demo.launch()
