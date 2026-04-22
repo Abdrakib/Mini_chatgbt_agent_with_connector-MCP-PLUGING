@@ -143,15 +143,6 @@ footer { display: none !important; }
     margin-bottom: 12px;
 }
 
-/* Fix user bubble going vertical */
-#chatbot .message-wrap .message {
-    display: block !important;
-    width: fit-content !important;
-    max-width: 72% !important;
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
-}
-
 #chatbot {
     background: #FFFEF8 !important;
     border: none !important;
@@ -273,6 +264,18 @@ footer { display: none !important; }
 div.svelte-1gfkn6j {
     padding-bottom: 0 !important;
     margin-bottom: 0 !important;
+}
+
+.gradio-container {
+    padding-bottom: 0 !important;
+}
+
+.main {
+    padding-bottom: 0 !important;
+}
+
+.wrap.svelte-1gfkn6j {
+    gap: 0 !important;
 }
 """
 
